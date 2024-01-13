@@ -1,0 +1,8 @@
+
+streamlit
+mysql-connector-python
+pandas
+matplotlib
+seaborn
+fuzzywuzzy
+python-dateutil
