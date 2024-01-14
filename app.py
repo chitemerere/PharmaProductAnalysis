@@ -50,41 +50,41 @@ def connect_db():
 #         st.error(f"Error while connecting to MySQL: {e}")  # Display the error message on the Streamlit app
 #         return None
 
-class DatabaseLogHandler(logging.Handler):
-    def emit(self, record):
-        db_connection = connect_db()
-        if db_connection is not None:
-            try:
-                cursor = db_connection.cursor()
-                log_entry = self.format(record)
-                cursor.execute("INSERT INTO app_logs (log_level, log_message) VALUES (%s, %s)",
-                               (record.levelname, log_entry))
-                db_connection.commit()
-                cursor.close()
-            except mysql.connector.Error as e:
-                print(f"Error while logging to database: {e}")
-            finally:
-                db_connection.close()
+# class DatabaseLogHandler(logging.Handler):
+#     def emit(self, record):
+#         db_connection = connect_db()
+#         if db_connection is not None:
+#             try:
+#                 cursor = db_connection.cursor()
+#                 log_entry = self.format(record)
+#                 cursor.execute("INSERT INTO app_logs (log_level, log_message) VALUES (%s, %s)",
+#                                (record.levelname, log_entry))
+#                 db_connection.commit()
+#                 cursor.close()
+#             except mysql.connector.Error as e:
+#                 print(f"Error while logging to database: {e}")
+#             finally:
+#                 db_connection.close()
                 
-# Set up logging
-logger = logging.getLogger('my_application_logger')
-logger.setLevel(logging.INFO)
+# # Set up logging
+# logger = logging.getLogger('my_application_logger')
+# logger.setLevel(logging.INFO)
 
-# Create and add the database log handler
-db_handler = DatabaseLogHandler()
-logger.addHandler(db_handler)
+# # Create and add the database log handler
+# db_handler = DatabaseLogHandler()
+# logger.addHandler(db_handler)
 
-try:
-    # Some code that might raise an exception
-    # Example: 
-    # result = potentially_failing_operation()
-    pass  # Use 'pass' if there's no actual code to execute yet
-except Exception as e:
-    logger.error(f"An error occurred: {e}")
+# try:
+#     # Some code that might raise an exception
+#     # Example: 
+#     # result = potentially_failing_operation()
+#     pass  # Use 'pass' if there's no actual code to execute yet
+# except Exception as e:
+#     logger.error(f"An error occurred: {e}")
 
 
-# After completing a significant task
-logger.info("Completed data processing step")
+# # After completing a significant task
+# logger.info("Completed data processing step")
 
 # Far more compact version!
 # my_db.connect(**st.secrets.connections.mysql)
