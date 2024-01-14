@@ -37,11 +37,18 @@ import logging
 def connect_db():
     try:
         return mysql.connector.connect(**st.secrets.db_credentials)
-#         return mysql.connector.connect(**st.secrets["connections"]["mysql"])
-
     except Error as e:
         st.error(f"Error while connecting to MySQL: {e}")  # Display the error message on the Streamlit app
         return None
+    
+# def connect_db():
+#     try:
+#         return mysql.connector.connect(**st.secrets.db_credentials)
+# #         return mysql.connector.connect(**st.secrets["connections"]["mysql"])
+
+#     except Error as e:
+#         st.error(f"Error while connecting to MySQL: {e}")  # Display the error message on the Streamlit app
+#         return None
 
 class DatabaseLogHandler(logging.Handler):
     def emit(self, record):
