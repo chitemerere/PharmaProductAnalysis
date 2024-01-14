@@ -16,23 +16,123 @@ from fuzzywuzzy import process
 from fuzzywuzzy import fuzz
 from datetime import date
 import os
+import logging
 
+# def connect_db():
+#     try:
+#         return mysql.connector.connect(
+#             host=os.environ.get("DB_HOST"),
+#             user=os.environ.get("DB_USER"),
+#             password=os.environ.get("DB_PASSWORD"),
+#             database="applogin",
+#             port=3306,
+#             ssl_ca="DigiCertGlobalRootCA.crt.pem",
+#             ssl_disabled=False
+#         )
+#     except Error as e:
+#         print("Error while connecting to MySQL:", e)
+#         return None
 
-# Connect to your MySQL database
+# Connect to your MySQL database 
 def connect_db():
     try:
-        return mysql.connector.connect(
-            host="pmsanalytics.mysql.database.azure.com",
-            user="chitemerere",
-            password="ruvimboML55AMG%",
-            database="applogin",
-            port=3306,
-            ssl_ca="DigiCertGlobalRootCA.crt.pem",
-            ssl_disabled=False
-        )
+        return mysql.connector.connect(**st.secrets.db_credentials)
+#         return mysql.connector.connect(**st.secrets["connections"]["mysql"])
+
     except Error as e:
-        print("Error while connecting to MySQL:", e)
+        st.error(f"Error while connecting to MySQL: {e}")  # Display the error message on the Streamlit app
         return None
+
+class DatabaseLogHandler(logging.Handler):
+    def emit(self, record):
+        db_connection = connect_db()
+        if db_connection is not None:
+            try:
+                cursor = db_connection.cursor()
+                log_entry = self.format(record)
+                cursor.execute("INSERT INTO app_logs (log_level, log_message) VALUES (%s, %s)",
+                               (record.levelname, log_entry))
+                db_connection.commit()
+                cursor.close()
+            except mysql.connector.Error as e:
+                print(f"Error while logging to database: {e}")
+            finally:
+                db_connection.close()
+                
+# Set up logging
+logger = logging.getLogger('my_application_logger')
+logger.setLevel(logging.INFO)
+
+# Create and add the database log handler
+db_handler = DatabaseLogHandler()
+logger.addHandler(db_handler)
+
+try:
+    # Some code that might raise an exception
+    # Example: 
+    # result = potentially_failing_operation()
+    pass  # Use 'pass' if there's no actual code to execute yet
+except Exception as e:
+    logger.error(f"An error occurred: {e}")
+
+
+# After completing a significant task
+logger.info("Completed data processing step")
+
+# Far more compact version!
+# my_db.connect(**st.secrets.connections.mysql)
+
+# Connect to your MySQL database 
+# def connect_db():
+#     try:
+#         return mysql.connector.connect(**st.secrets["connections.mysql"])
+#     except Error as e:
+#         print("Error while connecting to MySQL:", e)
+#         return None
+
+
+# def connect_db():
+#     try:
+#         return my_db.connect(**st.secrets.connections.mysql)
+#     except Error as e:
+#         print("Error while connecting to MySQL:", e)
+#         return None
+
+
+# #  Connect to your MySQL database
+# def connect_db():
+#     try:
+#         connection = mysql.connector.connect(
+#             host="pmsanalytics.mysql.database.azure.com",
+#             user="chitemerere",
+#             password="ruvimboML55AMG%",
+#             database="applogin",
+#             port=3306,
+#             ssl_ca="DigiCertGlobalRootCA.crt.pem",
+#             ssl_disabled=False
+#         )
+#         logging.info("Successfully connected to MySQL database")
+#         return connection
+#     except Error as e:
+#         logging.error("Error while connecting to MySQL: %s", e)
+#         return None
+
+
+# # Connect to your MySQL database
+# def connect_db():
+#     try:
+#         return mysql.connector.connect(
+#             host="pmsanalytics.mysql.database.azure.com",
+#             user="chitemerere",
+#             password="ruvimboML55AMG%",
+#             database="applogin",
+#             port=3306,
+#             ssl_ca="DigiCertGlobalRootCA.crt.pem",
+#             ssl_disabled=False
+#         )
+#     except Error as e:
+#         print("Error while connecting to MySQL:", e)
+#         return None
 
 # Function to hash passwords
 def hash_password(password):
@@ -1194,34 +1294,67 @@ def main():
     # Display the title, admin and user login forms only when no user is logged in
     if not st.session_state['user_logged_in']:
         st.title("User Management System")
-
+        
         # Admin login form
-        admin_username = admin_password = ""
-        if not st.session_state['admin_logged_in']:
+        if not st.session_state.get('admin_logged_in', False):
             st.subheader("Admin Login")
             admin_username = st.text_input("Admin Username", key="admin_user")
             admin_password = st.text_input("Admin Password", type="password", key="admin_pass")
+
             if st.button("Admin Login"):
-                if authenticate_user(admin_username, admin_password, admin_only=True):
-                    st.session_state['admin_logged_in'] = True
-                    st.success("Admin authentication successful")
-                else:
-                    st.error("Authentication failed")
+                try:
+                    if authenticate_user(admin_username, admin_password, admin_only=True):
+                        st.session_state['admin_logged_in'] = True
+                        st.success("Admin authentication successful")
+                    else:
+                        st.error("Authentication failed")
+                except Exception as e:
+                    # Catch any exceptions that occur during authentication
+                    st.error(f"An error occurred during authentication: {e}")
+
+#         # Admin login form
+#         admin_username = admin_password = ""
+#         if not st.session_state['admin_logged_in']:
+#             st.subheader("Admin Login")
+#             admin_username = st.text_input("Admin Username", key="admin_user")
+#             admin_password = st.text_input("Admin Password", type="password", key="admin_pass")
+#             if st.button("Admin Login"):
+#                 if authenticate_user(admin_username, admin_password, admin_only=True):
+#                     st.session_state['admin_logged_in'] = True
+#                     st.success("Admin authentication successful")
+#                 else:
+#                     st.error("Authentication failed")
 
         # User creation form shown only if admin is logged in
         if st.session_state['admin_logged_in']:
             create_new_user_ui(admin_username, admin_password)
-
+            
         # Regular user login form
         st.subheader("User Login")
         username = st.text_input("Username", key="user_name")
         password = st.text_input("Password", type="password", key="user_pass")
+
         if st.button("User Login"):
-            if authenticate_user(username, password, admin_only=False):
-                st.session_state['user_logged_in'] = True
-                st.success("Login successful")
-            else:
-                st.error("Login failed or account expired")
+            try:
+                if authenticate_user(username, password, admin_only=False):
+                    st.session_state['user_logged_in'] = True
+                    st.success("Login successful")
+                else:
+                    st.error("Login failed or account expired")
+            except Exception as e:
+                # Catch any exceptions that occur during authentication
+                st.error(f"An error occurred during authentication: {e}")
+
+#         # Regular user login form
+#         st.subheader("User Login")
+#         username = st.text_input("Username", key="user_name")
+#         password = st.text_input("Password", type="password", key="user_pass")
+#         if st.button("User Login"):
+#             if authenticate_user(username, password, admin_only=False):
+#                 st.session_state['user_logged_in'] = True
+#                 st.success("Login successful")
+#             else:
+#                 st.error("Login failed or account expired")
                 
         # User settings for changing password
         st.subheader("User Settings")
