@@ -37,8 +37,8 @@ import logging
 def connect_db():
     try:
 #         return mysql.connector.connect.secrets.toml(**st.secrets.db_credentials)
-#         return mysql.connector.connect.(**st.secrets.db_credentials)
-        return mysql.connector.connect.(**st.secrets.toml.db_credentials)
+        return mysql.connector.connect.(**st.secrets.db_credentials)
+#         return mysql.connector.connect.(**st.secrets.toml.db_credentials)
     except Error as e:
         st.error(f"Error while connecting to MySQL: {e}")  # Display the error message on the Streamlit app
         return None
