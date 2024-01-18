@@ -38,7 +38,7 @@ def connect_db():
     try:
 #         return mysql.connector.connect.secrets.toml(**st.secrets.db_credentials)
 #         return mysql.connector.connect(**st.secrets.database_config)
-        return mysql.connector.connect.(**st.secrets.toml.database_config)
+        return mysql.connector.connect(**st.secrets.toml.database_config)
     except Error as e:
         st.error(f"Error while connecting to MySQL: {e}")  # Display the error message on the Streamlit app
         return None
