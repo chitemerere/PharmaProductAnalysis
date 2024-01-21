@@ -21,7 +21,7 @@ import logging
 # And the root-level secrets are also accessible as environment variables:
 st.write(
     "Has environment variables been set:",
-    os.environ["dialect"] == st.secrets["dialect"],
+#     os.environ["dialect"] == st.secrets["dialect"],
     os.environ["host"] == st.secrets["host"],
     os.environ["port"] == st.secrets["port"],
     os.environ["database"] == st.secrets["database"],
