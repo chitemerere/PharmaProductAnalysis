@@ -38,7 +38,7 @@ def connect_db():
     try:
         # Assuming 'database_config' is a key in your secrets.toml file
         # and it contains necessary database connection parameters like host, user, password, etc.
-        return mysql.connector.connect(**st.secrets["database_config"])
+        return mysql.connector.connect(st.secrets["database_config"])
     except Error as e:
         st.error(f"Error while connecting to MySQL: {e}")  # Display the error message on the Streamlit app
         return None
