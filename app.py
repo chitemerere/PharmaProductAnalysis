@@ -18,6 +18,19 @@ from datetime import date
 import os
 import logging
 
+# And the root-level secrets are also accessible as environment variables:
+st.write(
+    "Has environment variables been set:",
+    os.environ["dialect"] == st.secrets["dialect"],
+    os.environ["host"] == st.secrets["host"],
+    os.environ["port"] == st.secrets["port"],
+    os.environ["database"] == st.secrets["database"],
+    os.environ["username"] == st.secrets["username"],
+    os.environ["password"] == st.secrets["password"],
+    os.environ["ssl_ca"] == st.secrets["ssl_ca"],
+    os.environ["ssl_disabled"] == st.secrets["ssl_disabled"]
+)
+
 # def connect_db():
 #     try:
 #         return mysql.connector.connect(
@@ -38,7 +51,7 @@ def connect_db():
     try:
         # Assuming 'database_config' is a key in your secrets.toml file
         # and it contains necessary database connection parameters like host, user, password, etc.
-        return mysql.connector.connect(st.secrets["database_config"])
+        return mysql.connector.connect**(st.secrets["database_config"])
     except Error as e:
         st.error(f"Error while connecting to MySQL: {e}")  # Display the error message on the Streamlit app
         return None
