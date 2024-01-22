@@ -10,6 +10,7 @@ from mysql.connector import Error
 import hashlib
 import datetime
 import pandas as pd
+import json
 import matplotlib.pyplot as plt
 import seaborn as sns
 from fuzzywuzzy import process
@@ -17,6 +18,26 @@ from fuzzywuzzy import fuzz
 from datetime import date
 import os
 import logging
+
+def connect_db():
+    try:
+        db_credentials = st.secrets['db_credentials']
+        return mysql.connector.connect(**db_credentials)
+    except mysql.connector.Error as e:
+        st.error(f"Error while connecting to MySQL: {e}")
+        return None
+
+# def connect_db():
+#     try:
+#         # Convert the string to a dictionary
+#         db_credentials = json.loads(st.secrets['db_credentials'])
+#         return mysql.connector.connect(**db_credentials)
+#     except mysql.connector.Error as e:
+#         st.error(f"Error while connecting to MySQL: {e}")
+#         return None
+#     except json.JSONDecodeError as json_err:
+#         st.error(f"Error decoding JSON: {json_err}")
+#         return None
 
 # db_config = {
 #     'user': st.secrets['db_credentials']['username'],
@@ -43,15 +64,15 @@ import logging
 # 'connection_timeout': 100
 # }
 
-db_credentials = st.secrets['db_credentials']
+# db_credentials = st.secrets["db_credentials"]
 
-def connect_db():
-    try:
-        db_credentials = st.secrets['db_credentials']
-        return mysql.connector.connect(**db_credentials)
-    except mysql.connector.Error as e:
-        st.error(f"Error while connecting to MySQL: {e}")
-        return None
+# def connect_db():
+#     try:
+#         db_credentials = st.secrets["db_credentials"]
+#         return mysql.connector.connect(**db_credentials)
+#     except mysql.connector.Error as e:
+#         st.error(f"Error while connecting to MySQL: {e}")
+#         return None
 
 # # Connect to your MySQL database 
 # db_config = st.secrets["db_credentials"]
