@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[1]:
 
 
 import streamlit as st
@@ -18,118 +18,87 @@ from datetime import date
 import os
 import logging
 
-# And the root-level secrets are also accessible as environment variables:
-# st.write(
-#     "Has environment variables been set:",
-# #     os.environ["dialect"] == st.secrets["dialect"],
-#     os.environ["host"] == st.secrets["host"],
-#     os.environ["port"] == st.secrets["port"],
-#     os.environ["database"] == st.secrets["database"],
-#     os.environ["username"] == st.secrets["username"],
-#     os.environ["password"] == st.secrets["password"],
-#     os.environ["ssl_ca"] == st.secrets["ssl_ca"],
-#     os.environ["ssl_disabled"] == st.secrets["ssl_disabled"]
-# )
+# db_config = {
+#     'user': st.secrets['db_credentials']['username'],
+#     'password': st.secrets['db_credentials']['password'],
+#     'host': st.secrets['db_credentials']['host'],
+#     'database': st.secrets['db_credentials']['database'],
+#     'port': st.secrets['db_credentials']['port'],
+#     'ssl_ca': st.secrets['db_credentials']['ssl_ca'],
+#     'ssl_disabled': st.secrets['db_credentials']['ssl_disabled'],
+#     'raise_on_warnings': True,
+#     'connection_timeout': 100
+# }
 
-# def connect_db():
-#     try:
-#         return mysql.connector.connect(
-#             host=os.environ.get("DB_HOST"),
-#             user=os.environ.get("DB_USER"),
-#             password=os.environ.get("DB_PASSWORD"),
-#             database="applogin",
-#             port=3306,
-#             ssl_ca="DigiCertGlobalRootCA.crt.pem",
-#             ssl_disabled=False
-#         )
-#     except Error as e:
-#         print("Error while connecting to MySQL:", e)
-#         return None
 
-# Connect to your MySQL database 
+# db_config = {
+# 'user': st.secrets['db_credentials']['username'],
+# 'password': st.secrets['db_credentials']['password'],
+# 'host': st.secrets['db_credentials']['host'],
+# 'database': st.secrets['db_credentials']['database'],
+# 'port' : st.secrets['db_credentials']['port'],
+# 'ssl_ca' : st.secrets['db_credentials']['ssl_ca'],
+# 'ssl_disabled' : st.secrets['db_credentials']['ssl_disabled'],
+# 'raise_on_warnings': True,
+# 'connection_timeout': 100
+# }
+
+db_credentials = st.secrets['db_credentials']
+
 def connect_db():
     try:
-        # Assuming 'database_config' is a key in your secrets.toml file
-        # and it contains necessary database connection parameters like host, user, password, etc.
-         return mysql.connector.connect**(st.secrets.db_credentials)
-#         return mysql.connector.connect**(st.secrets["database_config"])
-    except Error as e:
-        st.error(f"Error while connecting to MySQL: {e}")  # Display the error message on the Streamlit app
+        db_credentials = st.secrets['db_credentials']
+        return mysql.connector.connect(**db_credentials)
+    except mysql.connector.Error as e:
+        st.error(f"Error while connecting to MySQL: {e}")
         return None
-    
+
+# # Connect to your MySQL database 
+# db_config = st.secrets["db_credentials"]
+
 # def connect_db():
 #     try:
-# #         return mysql.connector.connect.secrets.toml(**st.secrets.db_credentials)
-# #         return mysql.connector.connect(**st.secrets.database_config)
-#         return mysql.connector.connect(**st.secrets.toml.database_config)
+#         return mysql.connector.connect(**db_config)
+#     except mysql.connector.Error as e:
+#         st.error(f"Error while connecting to MySQL: {e}")
+#         return None
+
+# def connect_db():
+#     return st.connection("mysql")
+
+# def connect_db():
+#     try:
+#         return st.connection("mysql")
+# #         return mysql.connector.connect(**db_config)
+#     except st.connector.Error as e:
+# #     except mysql.connector.Error as e:
+#         st.error(f"Error while connecting to MySQL: {e}")
+#         return None
+   
+  
+# # Connect to your MySQL database 
+# def connect_db():
+#     try:
+#         print("Type:", type(st.secrets["db_credentials"]))
+#         print("Value:", st.secrets["db_credentials"])
+#         return st.connection('db_credentials', type='sql')
+# #         return mysql.connector.connect(**st.secrets.db_credentials)
+# #         return mysql.connector.connect(**st.secrets["db_credentials"])
+# #         return mysql.connector.connect(pool_name = "mypool",
+# #                               pool_size = 3,
+# #                               **db_credentials)
 #     except Error as e:
-#         st.error(f"Error while connecting to MySQL: {e}")  # Display the error message on the Streamlit app
+#         st.error(f"Error while connecting to MySQL: {e}")
 #         return None
     
 # def connect_db():
 #     try:
-#         return mysql.connector.connect(**st.secrets.db_credentials)
-# #         return mysql.connector.connect(**st.secrets["connections"]["mysql"])
-
+#         # Assuming 'db_credentials' is a key in your secrets.toml file
+#         # and it contains necessary database connection parameters like host, user, password, etc.
+#         return mysql.connector.connect(**st.secrets["db_credentials"])
 #     except Error as e:
 #         st.error(f"Error while connecting to MySQL: {e}")  # Display the error message on the Streamlit app
 #         return None
-
-# class DatabaseLogHandler(logging.Handler):
-#     def emit(self, record):
-#         db_connection = connect_db()
-#         if db_connection is not None:
-#             try:
-#                 cursor = db_connection.cursor()
-#                 log_entry = self.format(record)
-#                 cursor.execute("INSERT INTO app_logs (log_level, log_message) VALUES (%s, %s)",
-#                                (record.levelname, log_entry))
-#                 db_connection.commit()
-#                 cursor.close()
-#             except mysql.connector.Error as e:
-#                 print(f"Error while logging to database: {e}")
-#             finally:
-#                 db_connection.close()
-                
-# # Set up logging
-# logger = logging.getLogger('my_application_logger')
-# logger.setLevel(logging.INFO)
-
-# # Create and add the database log handler
-# db_handler = DatabaseLogHandler()
-# logger.addHandler(db_handler)
-
-# try:
-#     # Some code that might raise an exception
-#     # Example: 
-#     # result = potentially_failing_operation()
-#     pass  # Use 'pass' if there's no actual code to execute yet
-# except Exception as e:
-#     logger.error(f"An error occurred: {e}")
-
-
-# # After completing a significant task
-# logger.info("Completed data processing step")
-
-# Far more compact version!
-# my_db.connect(**st.secrets.connections.mysql)
-
-# Connect to your MySQL database 
-# def connect_db():
-#     try:
-#         return mysql.connector.connect(**st.secrets["connections.mysql"])
-#     except Error as e:
-#         print("Error while connecting to MySQL:", e)
-#         return None
-
-
-# def connect_db():
-#     try:
-#         return my_db.connect(**st.secrets.connections.mysql)
-#     except Error as e:
-#         print("Error while connecting to MySQL:", e)
-#         return None
-
 
 # #  Connect to your MySQL database
 # def connect_db():
