@@ -19,6 +19,25 @@ from datetime import date
 import os
 import logging
 
+# Connect to MySQL database
+def connect_db():
+    try:
+        config = load_config()
+        connection = mysql.connector.connect (
+            host=config["database"]["host"],
+            user=config["database"]["user"],
+            password=config["database"]["password"],
+            database=config["database"]["database"],
+            port=config["database"]["port"],
+            ssl_ca=config["database"]["ssl_ca"],
+            ssl_disabled=config["database"]["ssl_disabled"],
+        )
+        logging.info("Successfully connected to MySQL database")
+        return connection
+    except Exception as e:
+        logging.error("Error while connecting to MySQL: %s", e)
+        return None
+
 # [database_config]
 # dialect = "mysql"
 # host = "pmsanalytics.mysql.database.azure.com"
@@ -29,44 +48,58 @@ import logging
 # ssl_ca = "DigiCertGlobalRootCA.crt.pem"
 # ssl_disabled = false
 
-# Load secrets from the Streamlit secrets file
-mysql_secrets = st.secrets["mysql"]
+# # Load secrets from the Streamlit secrets file
+# mysql_secrets = st.secrets["mysql"]
 
-# Initialize connection and cursor as None
-connection = None
-cursor = None
+# # Initialize connection and cursor as None
+# connection = None
+# cursor = None
 
-def connect_db():
-    global connection, cursor  # Declare connection and cursor as global variables
+# def connect_db():
+#     global connection, cursor  # Declare connection and cursor as global variables
 
-    try:
-        # Establish a database connection
-        connection = mysql.connector.connect(
-            host=mysql_secrets["host"],
-            port=mysql_secrets["port"],
-            database=mysql_secrets["database"],
-            user=mysql_secrets["username"],
-            password=mysql_secrets["password"],
-            ssl_ca=mysql_secrets['ssl_ca'],
-            ssl_disabled=mysql_secrets['ssl_disabled'],  # Correct the typo in 'ssl_disabled'
-        )
+#     try:
+#         # Establish a database connection
+#         connection = mysql.connector.connect(
+#             host=mysql_secrets["host"],
+#             port=mysql_secrets["port"],
+#             database=mysql_secrets["database"],
+#             user=mysql_secrets["username"],
+#             password=mysql_secrets["password"],
+#             ssl_ca=mysql_secrets.get("ssl_ca", None),
+#             ssl_disabled=mysql_secrets.get("ssl_disabled", None)
+# #             ssl_ca=mysql_secrets['ssl_ca'],
+# #             ssl_disabled=mysql_secrets['ssl_disabled'],  # Correct the typo in 'ssl_disabled'
+#         )
 
-        if connection.is_connected():
-            db_info = connection.get_server_info()
-            st.write("Connected to MySQL Server version ", db_info)
-            cursor = connection.cursor()
-            cursor.execute("select database();")
-            record = cursor.fetchone()
-            st.write("You're connected to database: ", record)
+#         if connection.is_connected():
+#             db_info = connection.get_server_info()
+#             st.write("Connected to MySQL Server version ", db_info)
+#             cursor = connection.cursor()
+#             cursor.execute("select database();")
+#             record = cursor.fetchone()
+#             st.write("You're connected to database: ", record)
 
-    except Error as e:
-        st.error("Error while connecting to MySQL", e)
+#     except Error as e:
+#         st.error("Error while connecting to MySQL", e)
 
-    finally:
-        if connection and connection.is_connected():
-            cursor.close()
-            connection.close()
-            st.write("MySQL connection is closed")
+#     finally:
+#         if connection and connection.is_connected():
+#             cursor.close()
+#             connection.close()
+#             st.write("MySQL connection is closed")
+            
+
+# # Print the type of 'st.secrets' to verify it's a dictionary
+# st.write("Type of st.secrets:", type(st.secrets))
+
+# # Print the type of 'st.secrets["mysql"]' to verify it's a dictionary
+# st.write("Type of st.secrets['mysql']:", type(st.secrets["mysql"]))
+
+# # If 'st.secrets["mysql"]' is a dictionary, print its keys
+# if isinstance(st.secrets["mysql"], dict):
+#     st.write("Keys in st.secrets['mysql']:", st.secrets["mysql"].keys())            
+
 
 # def connect_db():
 #     try:
