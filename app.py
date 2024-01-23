@@ -32,7 +32,13 @@ import logging
 # Load secrets from the Streamlit secrets file
 mysql_secrets = st.secrets["mysql"]
 
-def connect_db()
+# Initialize connection and cursor as None
+connection = None
+cursor = None
+
+def connect_db():
+    global connection, cursor  # Declare connection and cursor as global variables
+
     try:
         # Establish a database connection
         connection = mysql.connector.connect(
@@ -42,12 +48,12 @@ def connect_db()
             user=mysql_secrets["username"],
             password=mysql_secrets["password"],
             ssl_ca=mysql_secrets['ssl_ca'],
-            ssl_disabled=mysql_secrets['ssl_diabled'],
+            ssl_disabled=mysql_secrets['ssl_disabled'],  # Correct the typo in 'ssl_disabled'
         )
 
         if connection.is_connected():
-            db_Info = connection.get_server_info()
-            st.write("Connected to MySQL Server version ", db_Info)
+            db_info = connection.get_server_info()
+            st.write("Connected to MySQL Server version ", db_info)
             cursor = connection.cursor()
             cursor.execute("select database();")
             record = cursor.fetchone()
@@ -57,7 +63,7 @@ def connect_db()
         st.error("Error while connecting to MySQL", e)
 
     finally:
-        if connection.is_connected():
+        if connection and connection.is_connected():
             cursor.close()
             connection.close()
             st.write("MySQL connection is closed")
