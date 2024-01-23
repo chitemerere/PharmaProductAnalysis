@@ -22,21 +22,40 @@ import logging
 # Connect to MySQL database
 def connect_db():
     try:
-        config = load_config()
-        connection = mysql.connector.connect (
-            host=config["database"]["host"],
-            user=config["database"]["user"],
-            password=config["database"]["password"],
-            database=config["database"]["database"],
-            port=config["database"]["port"],
-            ssl_ca=config["database"]["ssl_ca"],
-            ssl_disabled=config["database"]["ssl_disabled"]
+        config = st.secrets["database"]
+        connection = mysql.connector.connect(
+            host=config["host"],
+            user=config["user"],
+            password=config["password"],
+            database=config["database"],
+            port=config["port"],
+            ssl_ca=config["ssl_ca"],
+            ssl_disabled=config["ssl_disabled"]
         )
         logging.info("Successfully connected to MySQL database")
         return connection
     except Exception as e:
         logging.error("Error while connecting to MySQL: %s", e)
         return None
+
+# # Connect to MySQL database
+# def connect_db():
+#     try:
+#         config = load_config()
+#         connection = mysql.connector.connect (
+#             host=config["database"]["host"],
+#             user=config["database"]["user"],
+#             password=config["database"]["password"],
+#             database=config["database"]["database"],
+#             port=config["database"]["port"],
+#             ssl_ca=config["database"]["ssl_ca"],
+#             ssl_disabled=config["database"]["ssl_disabled"]
+#         )
+#         logging.info("Successfully connected to MySQL database")
+#         return connection
+#     except Exception as e:
+#         logging.error("Error while connecting to MySQL: %s", e)
+#         return None
 
 # [database_config]
 # dialect = "mysql"
