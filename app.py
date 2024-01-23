@@ -19,13 +19,56 @@ from datetime import date
 import os
 import logging
 
-def connect_db():
+# [database_config]
+# dialect = "mysql"
+# host = "pmsanalytics.mysql.database.azure.com"
+# port = 3306
+# database = "applogin"
+# username = "chitemerere"
+# password = "ruvimboML55AMG%"
+# ssl_ca = "DigiCertGlobalRootCA.crt.pem"
+# ssl_disabled = false
+
+# Load secrets from the Streamlit secrets file
+mysql_secrets = st.secrets["mysql"]
+
+def connect_db()
     try:
-        db_credentials = st.secrets['db_credentials']
-        return mysql.connector.connect(**db_credentials)
-    except mysql.connector.Error as e:
-        st.error(f"Error while connecting to MySQL: {e}")
-        return None
+        # Establish a database connection
+        connection = mysql.connector.connect(
+            host=mysql_secrets["host"],
+            port=mysql_secrets["port"],
+            database=mysql_secrets["database"],
+            user=mysql_secrets["username"],
+            password=mysql_secrets["password"],
+            ssl_ca=mysql_secrets['ssl_ca'],
+            ssl_disabled=mysql_secrets['ssl_diabled'],
+        )
+
+        if connection.is_connected():
+            db_Info = connection.get_server_info()
+            st.write("Connected to MySQL Server version ", db_Info)
+            cursor = connection.cursor()
+            cursor.execute("select database();")
+            record = cursor.fetchone()
+            st.write("You're connected to database: ", record)
+
+    except Error as e:
+        st.error("Error while connecting to MySQL", e)
+
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
+            st.write("MySQL connection is closed")
+
+# def connect_db():
+#     try:
+#         db_credentials = st.secrets['db_credentials']
+#         return mysql.connector.connect(**db_credentials)
+#     except mysql.connector.Error as e:
+#         st.error(f"Error while connecting to MySQL: {e}")
+#         return None
 
 # def connect_db():
 #     try:
