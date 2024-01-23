@@ -30,7 +30,7 @@ def connect_db():
             database=config["database"]["database"],
             port=config["database"]["port"],
             ssl_ca=config["database"]["ssl_ca"],
-            ssl_disabled=config["database"]["ssl_disabled"],
+            ssl_disabled=config["database"]["ssl_disabled"]
         )
         logging.info("Successfully connected to MySQL database")
         return connection
