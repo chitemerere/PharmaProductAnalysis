@@ -1,61 +1,72 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[1]:
+
+
 import streamlit as st
 import mysql.connector
 from mysql.connector import Error
 import hashlib
 import datetime
 import pandas as pd
-import json
 import matplotlib.pyplot as plt
 import seaborn as sns
 from fuzzywuzzy import process
 from fuzzywuzzy import fuzz
 from datetime import date
 import os
+import toml
+import mysql
 import logging
 
-database = {
-    'user': 'user',
-    'password': 'password',
-    'host': 'host',
-    'port': 3306,  # Update the port number to 3305 because in installation i gave port 3305
-    'database':'database',
-    'ssl_ca': 'ssl_ca'
+# def load_config():
+#     secrets = {}
     
-}
+#     with open('secrets.toml', 'r') as fi:
+#         secrets = toml.load(fi)
 
-def connect_db():
-    """Create a connection to the MySQL database."""
-    db = mysql.connector.connect(**database)
-    return db
+#     return secrets
 
-
+# # Connect to your MySQL database
 # def connect_db():
 #     try:
-#         db_credentials = st.secrets['database']
-#         return mysql.connector.connect(**db_credentials)
-#     except mysql.connector.Error as e:
-#         st.error(f"Error while connecting to MySQL: {e}")
-#         return None
-
-
-# # Connect to MySQL database
-# def connect_db():
-#     try:
-#         config = st.secrets["database"]
-#         connection = mysql.connector.connect(
-#             host=config["host"],
-#             user=config["user"],
-#             password=config["password"],
-#             database=config["database"],
-#             port=config["port"],
-#             ssl_ca=config["ssl_ca"]
-            
+#         config = load_config()
+#         connection = mysql.connector.connect (
+#             host=config["database"]["host"],
+#             user=config["database"]["user"],
+#             password=config["database"]["password"],
+#             database=config["database"]["database"],
+#             port=config["database"]["port"],
+#             ssl_ca=config["database"]["ssl_ca"],
+#             ssl_disabled=config["database"]["ssl_disabled"]
 #         )
 #         logging.info("Successfully connected to MySQL database")
 #         return connection
 #     except Exception as e:
 #         logging.error("Error while connecting to MySQL: %s", e)
 #         return None
+
+# Connect to your MySQL database
+def connect_db():
+    try:
+        st.connection('mysql')
+#         config = load_config()
+#         connection = mysql.connector.connect (
+#             host=config["database"]["host"],
+#             user=config["database"]["user"],
+#             password=config["database"]["password"],
+#             database=config["database"]["database"],
+#             port=config["database"]["port"],
+#             ssl_ca=config["database"]["ssl_ca"],
+#             ssl_disabled=config["database"]["ssl_disabled"]
+#         )
+        logging.info("Successfully connected to MySQL database")
+        return connection
+    except Exception as e:
+        logging.error("Error while connecting to MySQL: %s", e)
+        return None
+
 
 # Function to hash passwords
 def hash_password(password):
@@ -1299,3 +1310,16 @@ def main():
         
 if __name__ == "__main__":
     main()
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
