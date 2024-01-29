@@ -49,8 +49,8 @@ import logging
 
 # Connect to your MySQL database
 def connect_db():
-    try:
-        st.connection('mysql')
+#     try:
+    st.connection('mysql')
 #         config = load_config()
 #         connection = mysql.connector.connect (
 #             host=config["database"]["host"],
@@ -61,11 +61,11 @@ def connect_db():
 #             ssl_ca=config["database"]["ssl_ca"],
 #             ssl_disabled=config["database"]["ssl_disabled"]
 #         )
-        logging.info("Successfully connected to MySQL database")
-        return connection
-    except Exception as e:
-        logging.error("Error while connecting to MySQL: %s", e)
-        return None
+#         logging.info("Successfully connected to MySQL database")
+#         return connection
+#     except Exception as e:
+#         logging.error("Error while connecting to MySQL: %s", e)
+#         return None
 
 
 # Function to hash passwords
