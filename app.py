@@ -49,24 +49,32 @@ import logging
 
 # Connect to your MySQL database
 def connect_db():
-#     try:
-    st.connection('mysql')
-#         config = load_config()
-#         connection = mysql.connector.connect (
-#             host=config["database"]["host"],
-#             user=config["database"]["user"],
-#             password=config["database"]["password"],
-#             database=config["database"]["database"],
-#             port=config["database"]["port"],
-#             ssl_ca=config["database"]["ssl_ca"],
-#             ssl_disabled=config["database"]["ssl_disabled"]
-#         )
-#         logging.info("Successfully connected to MySQL database")
-#         return connection
-#     except Exception as e:
-#         logging.error("Error while connecting to MySQL: %s", e)
-#         return None
-
+    try:
+        db_config = st.secrets["mysql"]
+        print(f"db_config: {db_config}") 
+        connection = mysql.connector.connect(
+            host=db_config["host"],
+            user=db_config["user"],
+            password=db_config["password"],
+            database=db_config["database"]
+        )
+        return connection
+    except Exception as e:
+        st.error(f"Error connecting to MySQL database: {str(e)}")
+        return None# Connect to your MySQL database
+def connect_db():
+    try:
+        db_config = st.secrets["mysql"]
+        connection = mysql.connector.connect(
+            host=db_config["host"],
+            user=db_config["user"],
+            password=db_config["password"],
+            database=db_config["database"]
+        )
+        return connection
+    except Exception as e:
+        st.error(f"Error connecting to MySQL database: {str(e)}")
+        return None
 
 # Function to hash passwords
 def hash_password(password):
