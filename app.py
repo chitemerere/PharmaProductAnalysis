@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[ ]:
 
 
 import streamlit as st
@@ -20,161 +20,7 @@ import toml
 import mysql
 import logging
 
-# def load_config():
-#     secrets = {}
-    
-#     with open('secrets.toml', 'r') as fi:
-#         secrets = toml.load(fi)
-
-#     return secrets
-
-# # Connect to your MySQL database
-# def connect_db():
-#     try:
-#         config = load_config()
-#         connection = mysql.connector.connect (
-#             host=config["database"]["host"],
-#             user=config["database"]["user"],
-#             password=config["database"]["password"],
-#             database=config["database"]["database"],
-#             port=config["database"]["port"],
-#             ssl_ca=config["database"]["ssl_ca"],
-#             ssl_disabled=config["database"]["ssl_disabled"]
-#         )
-#         logging.info("Successfully connected to MySQL database")
-#         return connection
-#     except Exception as e:
-#         logging.error("Error while connecting to MySQL: %s", e)
-#         return None
-
-# # Connect to your MySQL database
-# def connect_db():
-#     try:
-#         db_config = st.secrets["mysql"]
-#         print(f"db_config: {db_config}") 
-#         connection = mysql.connector.connect(
-#             host=db_config["host"],
-#             user=db_config["user"],
-#             password=db_config["password"],
-#             database=db_config["database"]
-#         )
-#         return connection
-#     except Exception as e:
-#         st.error(f"Error connecting to MySQL database: {str(e)}")
-#         return None# Connect to your MySQL database
-
-def connect_db():
-    try:
-        db_config = st.secrets["mysql"]
-        connection = mysql.connector.connect(
-            host=db_config["host"],
-            user=db_config["user"],
-            password=db_config["password"],
-            database=db_config["database"]
-        )
-        return connection
-    except Exception as e:
-        st.error(f"Error connecting to MySQL database: {str(e)}")
-        return None
-
-# Function to hash passwords
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
-
-# Function to authenticate user
-def authenticate_user(username, password, admin_only=False):
-    try:
-        db = connect_db()
-        if db is None:
-            raise Exception("Database connection could not be established")
-        cursor = db.cursor()
-        hashed_password = hash_password(password)
-        cursor.execute("""
-            SELECT expiry_date, role FROM users
-            WHERE username = %s AND password = %s
-        """, (username, hashed_password))
-        result = cursor.fetchone()
-        cursor.close()
-        db.close()
-        if result:
-            expiry_date, role = result
-            if date.today() <= expiry_date and (not admin_only or role == "admin"):
-                return True
-        return False
-    except Exception as e:
-        print("Error in authenticate_user:", e)
-        return False
-
-# Function to create a new user (admin only)
-def create_user(admin_username, admin_password, new_username, new_password, new_expiry_date):
-    try:
-        if authenticate_user(admin_username, admin_password, admin_only=True):
-            db = connect_db()
-            cursor = db.cursor()
-            hashed_password = hash_password(new_password)
-            cursor.execute("""
-                INSERT INTO users (username, password, expiry_date, role)
-                VALUES (%s, %s, %s, 'user')
-            """, (new_username, hashed_password, new_expiry_date))
-            db.commit()
-            cursor.close()
-            db.close()
-            return True
-        else:
-            print("Admin authentication failed in create_user")
-            return False
-    except Exception as e:
-        print("Error in create_user:", e)
-        return False
- 
-# Streamlit UI for creating new user
-def create_new_user_ui(admin_username, admin_password):
-    with st.form("Create User"):
-        new_username = st.text_input("New User Username")
-        new_password = st.text_input("New User Password", type="password")
-        new_expiry_date = st.date_input("Expiry Date")
-        create_user_button = st.form_submit_button("Create User")
-
-        if create_user_button:
-            if create_user(admin_username, admin_password, new_username, new_password, new_expiry_date):
-                st.success("User created successfully")
-            else:
-                st.error("Failed to create user")
                 
-def update_user_password(username, new_password):
-    try:
-        db = connect_db()
-        if db is None:
-            raise Exception("Failed to connect to the database")
-
-        cursor = db.cursor()
-
-        # Check if the user exists
-        cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
-        if cursor.fetchone() is None:
-            raise Exception("No such user found")
-
-        # Hash the new password
-        hashed_password = hash_password(new_password)
-
-        # Update the user's password
-        update_query = "UPDATE users SET password = %s WHERE username = %s"
-        cursor.execute(update_query, (hashed_password, username))
-
-        # Commit the changes
-        db.commit()
-
-        if cursor.rowcount == 0:
-            raise Exception("Password update failed")
-
-        cursor.close()
-        db.close()
-        return True
-
-    except Exception as e:
-        print(f"Error in update_user_password: {e}")
-        return False
-                 
 def safe_load_csv(uploaded_file):
     if uploaded_file is not None and uploaded_file.size > 0:
         return pd.read_csv(uploaded_file)
@@ -1227,22 +1073,26 @@ def display_main_application_content():
         st.warning('Please upload MCAZ Register CSV file.')
 
 def main():
-           
     # Password input
-    password_guess = st.text_input('What is the Password?', type ="password").strip()
+    password_guess = st.text_input('What is the Password?', type="password").strip()
 
     # Check if password is entered and incorrect
     if password_guess and password_guess != st.secrets["password"]:
         st.error("Incorrect password. Please try again.")
         st.stop()
 
-    # Proceed only if the password is correct
+    # Check if password is correct and not expired
     if password_guess == st.secrets["password"]:
-        st.success("Password is correct")
+        expiration_date = datetime.strptime(st.secrets["expiration_date"], "%d-%m-%Y")
+        if datetime.now() > expiration_date:
+            st.error("Password has expired. Please contact the administrator.")
+            st.stop()
+        else:
+            st.success("Password is correct and not expired")
 
-    # Display main application content if the user is logged in
-    display_main_application_content()
-        
+        # Display main application content if the user is logged in and the password is not expired
+        display_main_application_content()
+
 if __name__ == "__main__":
     main()
 
