@@ -182,7 +182,8 @@ def display_main_application_content():
                 st.error("The 'Manufacturers' column is missing from the uploaded data.")
 
             # Generic Name (Product) Filter
-            st.write(data.columns)  # Add this line to check the column names
+#             st.write(data.columns)  # Add this line to check the column names
+            data.columns = data.columns.str.strip()
             product_options = ['All Products'] + sorted(data['Generic Name'].dropna().unique().tolist())
             selected_product = st.selectbox('Select Generic Name', product_options, index=0)
 
