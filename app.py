@@ -62,19 +62,20 @@ def connect_db():
     except Exception as e:
         st.error(f"Error connecting to MySQL database: {str(e)}")
         return None# Connect to your MySQL database
-def connect_db():
-    try:
-        db_config = st.secrets["mysql"]
-        connection = mysql.connector.connect(
-            host=db_config["host"],
-            user=db_config["user"],
-            password=db_config["password"],
-            database=db_config["database"]
-        )
-        return connection
-    except Exception as e:
-        st.error(f"Error connecting to MySQL database: {str(e)}")
-        return None
+
+# def connect_db():
+#     try:
+#         db_config = st.secrets["mysql"]
+#         connection = mysql.connector.connect(
+#             host=db_config["host"],
+#             user=db_config["user"],
+#             password=db_config["password"],
+#             database=db_config["database"]
+#         )
+#         return connection
+#     except Exception as e:
+#         st.error(f"Error connecting to MySQL database: {str(e)}")
+#         return None
 
 # Function to hash passwords
 def hash_password(password):
