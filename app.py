@@ -182,7 +182,7 @@ def display_main_application_content():
                 st.error("The 'Manufacturers' column is missing from the uploaded data.")
 
             # Generic Name (Product) Filter
-            print(data.columns)  # Add this line to check the column names
+            st.write(data.columns)  # Add this line to check the column names
             product_options = ['All Products'] + sorted(data['Generic Name'].dropna().unique().tolist())
             selected_product = st.selectbox('Select Generic Name', product_options, index=0)
 
@@ -1094,10 +1094,10 @@ def main():
             return
 
         if datetime.now() > expiration_date:
-            st.error("Password has expired. Please contact the administrator.")
+            st.error("Product license has expired. Please contact the administrator.")
             st.stop()
         else:
-            st.success("Password is correct and not expired")
+            st.success("Password is correct and license has not expired")
 
         # Display main application content if the user is logged in and the password is not expired
         display_main_application_content()
