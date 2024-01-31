@@ -1081,9 +1081,19 @@ def main():
         st.error("Incorrect password. Please try again.")
         st.stop()
 
-    # Check if password is correct and not expired
+    # Check if password is correct
     if password_guess == st.secrets["password"]:
-        expiration_date = datetime.strptime(st.secrets["expiration_date"], "%d-%m-%Y")
+        # Debugging: print the expiration date value and type
+        st.write("Debug - Expiration Date from secrets:", st.secrets.get("expiration_date"))
+        st.write("Debug - Type of Expiration Date:", type(st.secrets.get("expiration_date")))
+
+        try:
+            expiration_date = datetime.strptime(st.secrets["expiration_date"], "%d-%m-%Y")
+        except Exception as e:
+            st.error(f"Error parsing expiration date: {e}")
+            st.stop()
+            return
+
         if datetime.now() > expiration_date:
             st.error("Password has expired. Please contact the administrator.")
             st.stop()
