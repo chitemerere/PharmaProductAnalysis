@@ -1083,10 +1083,6 @@ def main():
 
     # Check if password is correct
     if password_guess == st.secrets["password"]:
-        # Debugging: print the expiration date value and type
-        st.write("Debug - Expiration Date from secrets:", st.secrets.get("expiration_date"))
-        st.write("Debug - Type of Expiration Date:", type(st.secrets.get("expiration_date")))
-
         try:
             expiration_date = datetime.strptime(st.secrets["expiration_date"], "%d-%m-%Y")
         except Exception as e:
