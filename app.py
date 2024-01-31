@@ -47,25 +47,11 @@ import logging
 #         logging.error("Error while connecting to MySQL: %s", e)
 #         return None
 
-# Connect to your MySQL database
-def connect_db():
-    try:
-        db_config = st.secrets["mysql"]
-        print(f"db_config: {db_config}") 
-        connection = mysql.connector.connect(
-            host=db_config["host"],
-            user=db_config["user"],
-            password=db_config["password"],
-            database=db_config["database"]
-        )
-        return connection
-    except Exception as e:
-        st.error(f"Error connecting to MySQL database: {str(e)}")
-        return None# Connect to your MySQL database
-
+# # Connect to your MySQL database
 # def connect_db():
 #     try:
 #         db_config = st.secrets["mysql"]
+#         print(f"db_config: {db_config}") 
 #         connection = mysql.connector.connect(
 #             host=db_config["host"],
 #             user=db_config["user"],
@@ -75,7 +61,21 @@ def connect_db():
 #         return connection
 #     except Exception as e:
 #         st.error(f"Error connecting to MySQL database: {str(e)}")
-#         return None
+#         return None# Connect to your MySQL database
+
+def connect_db():
+    try:
+        db_config = st.secrets["mysql"]
+        connection = mysql.connector.connect(
+            host=db_config["host"],
+            user=db_config["user"],
+            password=db_config["password"],
+            database=db_config["database"]
+        )
+        return connection
+    except Exception as e:
+        st.error(f"Error connecting to MySQL database: {str(e)}")
+        return None
 
 # Function to hash passwords
 def hash_password(password):
@@ -1228,94 +1228,20 @@ def display_main_application_content():
 
 def main():
            
-    # Initialize session state for admin and user login
-    if 'admin_logged_in' not in st.session_state:
-        st.session_state['admin_logged_in'] = False
-    if 'user_logged_in' not in st.session_state:
-        st.session_state['user_logged_in'] = False
+    # Password input
+    password_guess = st.text_input('What is the Password?', type ="password").strip()
 
-    # Display the title, admin and user login forms only when no user is logged in
-    if not st.session_state['user_logged_in']:
-        st.title("User Management System")
-        
-        # Admin login form
-        if not st.session_state.get('admin_logged_in', False):
-            st.subheader("Admin Login")
-            admin_username = st.text_input("Admin Username", key="admin_user")
-            admin_password = st.text_input("Admin Password", type="password", key="admin_pass")
+    # Check if password is entered and incorrect
+    if password_guess and password_guess != st.secrets["password"]:
+        st.error("Incorrect password. Please try again.")
+        st.stop()
 
-            if st.button("Admin Login"):
-                try:
-                    if authenticate_user(admin_username, admin_password, admin_only=True):
-                        st.session_state['admin_logged_in'] = True
-                        st.success("Admin authentication successful")
-                    else:
-                        st.error("Authentication failed")
-                except Exception as e:
-                    # Catch any exceptions that occur during authentication
-                    st.error(f"An error occurred during authentication: {e}")
-
-#         # Admin login form
-#         admin_username = admin_password = ""
-#         if not st.session_state['admin_logged_in']:
-#             st.subheader("Admin Login")
-#             admin_username = st.text_input("Admin Username", key="admin_user")
-#             admin_password = st.text_input("Admin Password", type="password", key="admin_pass")
-#             if st.button("Admin Login"):
-#                 if authenticate_user(admin_username, admin_password, admin_only=True):
-#                     st.session_state['admin_logged_in'] = True
-#                     st.success("Admin authentication successful")
-#                 else:
-#                     st.error("Authentication failed")
-
-        # User creation form shown only if admin is logged in
-        if st.session_state['admin_logged_in']:
-            create_new_user_ui(admin_username, admin_password)
-            
-        # Regular user login form
-        st.subheader("User Login")
-        username = st.text_input("Username", key="user_name")
-        password = st.text_input("Password", type="password", key="user_pass")
-
-        if st.button("User Login"):
-            try:
-                if authenticate_user(username, password, admin_only=False):
-                    st.session_state['user_logged_in'] = True
-                    st.success("Login successful")
-                else:
-                    st.error("Login failed or account expired")
-            except Exception as e:
-                # Catch any exceptions that occur during authentication
-                st.error(f"An error occurred during authentication: {e}")
-
-#         # Regular user login form
-#         st.subheader("User Login")
-#         username = st.text_input("Username", key="user_name")
-#         password = st.text_input("Password", type="password", key="user_pass")
-#         if st.button("User Login"):
-#             if authenticate_user(username, password, admin_only=False):
-#                 st.session_state['user_logged_in'] = True
-#                 st.success("Login successful")
-#             else:
-#                 st.error("Login failed or account expired")
-                
-        # User settings for changing password
-        st.subheader("User Settings")
-        with st.form("Change Password"):
-            new_password = st.text_input("New Password", type="password", key='new_password')
-            update_button = st.form_submit_button("Update Password")
-
-            if update_button:
-                # Retrieve the current logged-in user's username from session state
-                current_username = st.session_state['current_user']
-                if update_user_password(current_username, new_password):
-                    st.success("Password updated successfully")
-                else:
-                    st.error("Failed to update password")
+    # Proceed only if the password is correct
+    if password_guess == st.secrets["password"]:
+        st.success("Password is correct")
 
     # Display main application content if the user is logged in
-    if st.session_state['user_logged_in']:
-        display_main_application_content()
+    display_main_application_content()
         
 if __name__ == "__main__":
     main()
