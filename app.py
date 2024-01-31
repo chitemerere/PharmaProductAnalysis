@@ -15,6 +15,7 @@ import seaborn as sns
 from fuzzywuzzy import process
 from fuzzywuzzy import fuzz
 from datetime import date
+from datetime import datetime
 import os
 import toml
 import mysql
@@ -1084,6 +1085,7 @@ def main():
     # Check if password is correct
     if password_guess == st.secrets["password"]:
         try:
+            # Correctly using datetime.strptime now
             expiration_date = datetime.strptime(st.secrets["expiration_date"], "%d-%m-%Y")
         except Exception as e:
             st.error(f"Error parsing expiration date: {e}")
