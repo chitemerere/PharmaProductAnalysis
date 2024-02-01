@@ -183,7 +183,7 @@ def display_main_application_content():
 
             # Generic Name (Product) Filter
 #             st.write(data.columns)  # Add this line to check the column names
-            data.columns = data.columns.str.strip()
+#             data.columns = data.columns.str.strip()
             data.columns = [str(col).strip() for col in data.columns]
             product_options = ['All Products'] + sorted(data['Generic Name'].dropna().unique().tolist())
             selected_product = st.selectbox('Select Generic Name', product_options, index=0)
