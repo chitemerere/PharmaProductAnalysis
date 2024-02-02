@@ -431,6 +431,16 @@ def display_main_application_content():
                 
             else:
                 st.warning("Please complete the fuzzy matching process first.")
+                
+            # Download file
+            csv = convert_df_to_csv(mcaz_register)
+            if csv is not None:
+                # Proceed with operations that use 'csv'
+                st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register.csv', mime='text/csv', key='download_mcaz_withatcdescription')
+
+            else:
+                # Handle the case where 'csv' is None, e.g., display a message or take alternative action
+                print("No data available to convert to CSV")
 
                     
             # Filters
@@ -507,6 +517,16 @@ def display_main_application_content():
                     st.write("Data not available in the session state.")
             else:
                 st.write("Select 'Human Medicine' to access user type based data filtering.")
+                
+            # Download file
+            csv = convert_df_to_csv(mcaz_register)
+            if csv is not None:
+                # Proceed with operations that use 'csv'
+                st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register.csv', mime='text/csv', key='download_mcaz_filtered')
+
+            else:
+                # Handle the case where 'csv' is None, e.g., display a message or take alternative action
+                print("No data available to convert to CSV")
 
 
         # Market Analysis
