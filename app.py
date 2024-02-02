@@ -33,15 +33,34 @@ def safe_load_csv(uploaded_file):
 
 def load_data(uploaded_file):
     if uploaded_file is not None:
-        try:
-            df = pd.read_csv(uploaded_file)
-            df['Generic Name'] = df['Generic Name'].str.upper().str.strip()
-            return df
-        except pd.errors.EmptyDataError:
+        # Check if the uploaded file is not empty
+        uploaded_file.seek(0)  # Go to the start of the file
+        if uploaded_file.read(1024) == b'':  # Read the first 1KB to check if it's empty
+            st.error('The uploaded file is empty.')
+            return pd.DataFrame()
+        
+        # Reset the file pointer to the start of the file after checking
+        uploaded_file.seek(0)
+        
+        # Since the file is not empty, attempt to read it as a CSV
+        df = pd.read_csv(uploaded_file)
+        
+        # After loading, check if the DataFrame is actually empty or if there's a 'Generic Name' column
+        if df.empty:
             st.error('The uploaded file is empty or not in a valid CSV format.')
             return pd.DataFrame()
-    return pd.DataFrame()
+        
+        if 'Generic Name' in df.columns:
+            df['Generic Name'] = df['Generic Name'].str.upper().str.strip()
+        else:
+            st.error("'Generic Name' column not found in the uploaded file.")
+            return pd.DataFrame()
 
+        return df
+    else:
+        # If no file was uploaded, return an empty DataFrame
+        return pd.DataFrame()
+        
 # Function to extract ATC level codes for Human Medicine
 def extract_atc_levels_human(atc_code):
     return (atc_code[:1], atc_code[:3], atc_code[:4], atc_code[:5])
@@ -147,7 +166,7 @@ def filter_dataframe(df, column, value):
 
 def display_main_application_content():
                         
-    st.markdown("<h1 style='font-size:30px;'>Pharmaceutical Products Analysis Application</h1>", unsafe_allow_html=True)
+#     st.markdown("<h1 style='font-size:30px;'>Pharmaceutical Products Analysis Application</h1>", unsafe_allow_html=True)
     # Initialize mcaz_register as an empty DataFrame at the start
     mcaz_register = pd.DataFrame()       
 
@@ -1078,6 +1097,7 @@ def display_main_application_content():
 
 def main():
     # Password input
+    st.markdown("<h1 style='font-size:30px;'>Pharmaceutical Products Analysis Application</h1>", unsafe_allow_html=True)
     password_guess = st.text_input('What is the Password?', type="password").strip()
 
     # Check if password is entered and incorrect
