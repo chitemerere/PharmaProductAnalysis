@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[1]:
 
 
 import streamlit as st
@@ -9,6 +9,7 @@ import mysql.connector
 from mysql.connector import Error
 import hashlib
 import datetime
+from zoneinfo import ZoneInfo
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -21,6 +22,8 @@ import toml
 import mysql
 import logging
 
+# Specify the timezone for Harare
+harare_timezone = ZoneInfo("Africa/Harare")
                 
 def safe_load_csv(uploaded_file):
     if uploaded_file is not None and uploaded_file.size > 0:
@@ -292,7 +295,7 @@ def display_main_application_content():
             # Process data only if files are uploaded and fuzzy_matched_data is empty
             if mcaz_register_file and atc_index_file and st.session_state.fuzzy_matched_data.empty:
                 with st.spinner('Processing and mapping data...'):
-                    start_time = datetime.now()  # Capture start time
+                    start_time = datetime.now(harare_timezone)  # Capture start time
                     st.write(f"Start Time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")  # Optionally display the start time
 
                     # Load the two files
@@ -312,7 +315,7 @@ def display_main_application_content():
                     # Update the session state
                     st.session_state.fuzzy_matched_data = mcaz_register
 
-                    end_time = datetime.now()  # Capture end time
+                    end_time = datetime.now(harare_timezone)  # Capture end time
                     st.write(f"End Time: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")  # Optionally display the end time
 
                     # Calculate and display processing time
@@ -492,9 +495,9 @@ def display_main_application_content():
                 else:
                     st.write("No filter applied.")
 
-                    # Download file option
-                    csv = convert_df_to_csv(filtered_data)
-                    st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_filtered.csv', mime='text/csv', key='download_mcaz_register_filtered')
+            # Download file option
+            csv = convert_df_to_csv(filtered_data)
+            st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_filtered.csv', mime='text/csv', key='download_mcaz_register_filtered')
 
             # Filter data based on local manufacturer or importer for selected type
             st.subheader("Data Filtering Based on User Type and Selected Filter")
@@ -1159,9 +1162,7 @@ def main():
     if password_guess == st.secrets["password"]:
         try:
             # Correctly using datetime.strptime now
-#             expiration_date = st.secrets["expiration_date"]
             expiration_date = datetime.strptime(st.secrets["expiration_date"], "%d-%m-%Y")
-#             expiration_date = dt.strptime(st.secrets["expiration_date"], "%d-%m-%Y")
         except Exception as e:
             st.error(f"Error parsing expiration date: {e}")
             st.stop()
