@@ -14,8 +14,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from fuzzywuzzy import process
 from fuzzywuzzy import fuzz
-from datetime import date
-from datetime import datetime
+# from datetime import date
+from datetime import datetime 
 import os
 import toml
 import mysql
@@ -292,10 +292,13 @@ def display_main_application_content():
             # Process data only if files are uploaded and fuzzy_matched_data is empty
             if mcaz_register_file and atc_index_file and st.session_state.fuzzy_matched_data.empty:
                 with st.spinner('Processing and mapping data...'):
+                    start_time = datetime.now()  # Capture start time
+                    st.write(f"Start Time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")  # Optionally display the start time
+
                     # Load the two files
                     mcaz_register = pd.read_csv(mcaz_register_file)
                     atc_index = pd.read_csv(atc_index_file)
-                    
+
                     # Fuzzy Matching Logic
                     name_to_atc_code = dict(zip(atc_index['Name'], atc_index['ATCCode']))
                     mcaz_register['Best Match Name'] = mcaz_register['Generic Name'].apply(
@@ -305,8 +308,35 @@ def display_main_application_content():
                         lambda x: process.extractOne(x, atc_index['Name'])[1]
                     )
                     mcaz_register['ATCCode'] = mcaz_register['Best Match Name'].map(name_to_atc_code)
+
                     # Update the session state
                     st.session_state.fuzzy_matched_data = mcaz_register
+
+                    end_time = datetime.now()  # Capture end time
+                    st.write(f"End Time: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")  # Optionally display the end time
+
+                    # Calculate and display processing time
+                    processing_time = end_time - start_time
+                    st.write(f"Processing Time: {processing_time}")
+            
+#             # Process data only if files are uploaded and fuzzy_matched_data is empty
+#             if mcaz_register_file and atc_index_file and st.session_state.fuzzy_matched_data.empty:
+#                 with st.spinner('Processing and mapping data...'):
+#                     # Load the two files
+#                     mcaz_register = pd.read_csv(mcaz_register_file)
+#                     atc_index = pd.read_csv(atc_index_file)
+                    
+#                     # Fuzzy Matching Logic
+#                     name_to_atc_code = dict(zip(atc_index['Name'], atc_index['ATCCode']))
+#                     mcaz_register['Best Match Name'] = mcaz_register['Generic Name'].apply(
+#                         lambda x: process.extractOne(x, atc_index['Name'])[0]
+#                     )
+#                     mcaz_register['Match Score'] = mcaz_register['Generic Name'].apply(
+#                         lambda x: process.extractOne(x, atc_index['Name'])[1]
+#                     )
+#                     mcaz_register['ATCCode'] = mcaz_register['Best Match Name'].map(name_to_atc_code)
+#                     # Update the session state
+#                     st.session_state.fuzzy_matched_data = mcaz_register
 
             # Display the processed data only if it exists in session state
             if 'fuzzy_matched_data' in st.session_state and not st.session_state.fuzzy_matched_data.empty:
@@ -1129,7 +1159,9 @@ def main():
     if password_guess == st.secrets["password"]:
         try:
             # Correctly using datetime.strptime now
+#             expiration_date = st.secrets["expiration_date"]
             expiration_date = datetime.strptime(st.secrets["expiration_date"], "%d-%m-%Y")
+#             expiration_date = dt.strptime(st.secrets["expiration_date"], "%d-%m-%Y")
         except Exception as e:
             st.error(f"Error parsing expiration date: {e}")
             st.stop()
