@@ -9,7 +9,6 @@ import mysql.connector
 from mysql.connector import Error
 import hashlib
 import datetime
-from zoneinfo import ZoneInfo
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -17,6 +16,7 @@ from fuzzywuzzy import process
 from fuzzywuzzy import fuzz
 # from datetime import date
 from datetime import datetime 
+from zoneinfo import ZoneInfo
 import os
 import toml
 import mysql
@@ -292,7 +292,7 @@ def display_main_application_content():
             atc_index = None
             mcaz_register = None
             
-            # Process data only if files are uploaded and fuzzy_matched_data is empty
+           # Process data only if files are uploaded and fuzzy_matched_data is empty
             if mcaz_register_file and atc_index_file and st.session_state.fuzzy_matched_data.empty:
                 with st.spinner('Processing and mapping data...'):
                     start_time = datetime.now(harare_timezone)  # Capture start time
@@ -302,15 +302,33 @@ def display_main_application_content():
                     mcaz_register = pd.read_csv(mcaz_register_file)
                     atc_index = pd.read_csv(atc_index_file)
 
-                    # Fuzzy Matching Logic
+                    # Initialize progress bar
+                    progress_bar = st.progress(0)
+                    total_rows = len(mcaz_register)
+
+                    # Fuzzy Matching Logic with Corrected DataFrame Assignment
                     name_to_atc_code = dict(zip(atc_index['Name'], atc_index['ATCCode']))
-                    mcaz_register['Best Match Name'] = mcaz_register['Generic Name'].apply(
-                        lambda x: process.extractOne(x, atc_index['Name'])[0]
-                    )
-                    mcaz_register['Match Score'] = mcaz_register['Generic Name'].apply(
-                        lambda x: process.extractOne(x, atc_index['Name'])[1]
-                    )
-                    mcaz_register['ATCCode'] = mcaz_register['Best Match Name'].map(name_to_atc_code)
+
+                    # Define the fuzzy_match_and_update function as previously described
+                    def fuzzy_match_and_update(row):
+                        match_result = process.extractOne(row['Generic Name'], atc_index['Name'])
+                        if match_result:
+                            # Use a more flexible approach to unpack, expecting at least two values
+                            best_match_name, match_score = match_result[0], match_result[1]
+                        else:
+                            # Provide default values in case no match is found
+                            best_match_name, match_score = None, 0
+                        
+                        # Use .get() with a default of None if best_match_name is not in name_to_atc_code
+                        atc_code = name_to_atc_code.get(best_match_name, None)
+                        
+                        return pd.Series([best_match_name, match_score, atc_code])
+
+                    # Apply function and update DataFrame
+                    mcaz_register[['Best Match Name', 'Match Score', 'ATCCode']] = mcaz_register.apply(fuzzy_match_and_update, axis=1, result_type='expand')
+
+                    # Complete progress bar
+                    progress_bar.progress(100)
 
                     # Update the session state
                     st.session_state.fuzzy_matched_data = mcaz_register
@@ -321,14 +339,17 @@ def display_main_application_content():
                     # Calculate and display processing time
                     processing_time = end_time - start_time
                     st.write(f"Processing Time: {processing_time}")
-            
-#             # Process data only if files are uploaded and fuzzy_matched_data is empty
+
+              # Process data only if files are uploaded and fuzzy_matched_data is empty
 #             if mcaz_register_file and atc_index_file and st.session_state.fuzzy_matched_data.empty:
 #                 with st.spinner('Processing and mapping data...'):
+#                     start_time = datetime.now(harare_timezone)  # Capture start time
+#                     st.write(f"Start Time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")  # Optionally display the start time
+
 #                     # Load the two files
 #                     mcaz_register = pd.read_csv(mcaz_register_file)
 #                     atc_index = pd.read_csv(atc_index_file)
-                    
+
 #                     # Fuzzy Matching Logic
 #                     name_to_atc_code = dict(zip(atc_index['Name'], atc_index['ATCCode']))
 #                     mcaz_register['Best Match Name'] = mcaz_register['Generic Name'].apply(
@@ -338,9 +359,17 @@ def display_main_application_content():
 #                         lambda x: process.extractOne(x, atc_index['Name'])[1]
 #                     )
 #                     mcaz_register['ATCCode'] = mcaz_register['Best Match Name'].map(name_to_atc_code)
+
 #                     # Update the session state
 #                     st.session_state.fuzzy_matched_data = mcaz_register
 
+#                     end_time = datetime.now(harare_timezone)  # Capture end time
+#                     st.write(f"End Time: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")  # Optionally display the end time
+
+#                     # Calculate and display processing time
+#                     processing_time = end_time - start_time
+#                     st.write(f"Processing Time: {processing_time}")
+            
             # Display the processed data only if it exists in session state
             if 'fuzzy_matched_data' in st.session_state and not st.session_state.fuzzy_matched_data.empty:
                 st.write("Updated MCAZ Register with Fuzzy Matching and ATC Codes:")
