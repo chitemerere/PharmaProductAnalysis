@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[ ]:
 
 
 import streamlit as st
@@ -9,6 +9,7 @@ import mysql.connector
 from mysql.connector import Error
 import hashlib
 import datetime
+from zoneinfo import ZoneInfo
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -16,7 +17,6 @@ from fuzzywuzzy import process
 from fuzzywuzzy import fuzz
 # from datetime import date
 from datetime import datetime 
-from zoneinfo import ZoneInfo
 import os
 import toml
 import mysql
@@ -24,7 +24,7 @@ import logging
 
 # Specify the timezone for Harare
 harare_timezone = ZoneInfo("Africa/Harare")
-                
+
 def safe_load_csv(uploaded_file):
     if uploaded_file is not None and uploaded_file.size > 0:
         return pd.read_csv(uploaded_file)
@@ -106,12 +106,31 @@ def load_and_process_prohibited_generics(uploaded_file):
 
 def filter_data_for_user(user_type, merged_data, prohibited_list):
     if user_type == 'Importer':
-        # Filter out prohibited generics for importers
-        filtered_data = merged_data[~merged_data['Generic Name'].isin(prohibited_list['Generic Name'])]
+        # Create a temporary column to identify rows to be filtered out
+        # Merge merged_data with prohibited_list on both 'Generic Name' and 'Form'
+        # Use an indicator to identify rows that exist in both DataFrames
+        temp_merged = merged_data.merge(prohibited_list, on=['Generic Name', 'Form'], how='left', indicator=True)
+        
+        # Filter out rows that are found in the prohibited_list (i.e., those with '_merge' == 'both')
+        filtered_data = temp_merged[temp_merged['_merge'] == 'left_only']
+        
+        # Drop the '_merge' column as it's no longer needed
+        filtered_data = filtered_data.drop(columns=['_merge'])
     else:
         # Local Manufacturer gets the full data
         filtered_data = merged_data
+    
     return filtered_data
+
+
+# def filter_data_for_user(user_type, merged_data, prohibited_list):
+#     if user_type == 'Importer':
+#         # Filter out prohibited generics for importers
+#         filtered_data = merged_data[~merged_data['Generic Name'].isin(prohibited_list['Generic Name'])]
+#     else:
+#         # Local Manufacturer gets the full data
+#         filtered_data = merged_data
+#     return filtered_data
 
 def apply_mutually_exclusive_filters(data, filters):
     for key, selected in filters.items():
@@ -167,6 +186,33 @@ def filter_dataframe(df, column, value):
         return df[df[column] == value]
     return df
 
+# Function to load data from an uploaded file
+def load_data_sales(uploaded_file):
+    if uploaded_file is not None:
+        try:
+            # Attempt to read the uploaded file with specified encoding
+            df = pd.read_csv(uploaded_file, encoding='latin1')
+            # Check if the file is empty by looking at the DataFrame shape
+            if df.empty:
+                st.error("Uploaded file is empty. Please upload a file with data.")
+                return pd.DataFrame()  # Return an empty DataFrame as a fallback
+            return df
+        except pd.errors.EmptyDataError:
+            # Handle the case where the CSV file is empty or not properly formatted
+            st.error("Uploaded file is empty or not properly formatted. Please check the file and try again.")
+            return pd.DataFrame()  # Return an empty DataFrame as a fallback
+        except UnicodeDecodeError as e:
+            # Handle potential Unicode decoding errors by providing a message to the user
+            st.error(f"Error decoding file: {e}. Try changing the file encoding and upload again.")
+            return pd.DataFrame()
+        except Exception as e:
+            # Handle any other exceptions that may occur
+            st.error(f"An error occurred while processing the file: {e}")
+            return pd.DataFrame()
+    else:
+        # If no file is uploaded, return an empty DataFrame
+        return pd.DataFrame()
+
 def display_main_application_content():
                         
 #     st.markdown("<h1 style='font-size:30px;'>Pharmaceutical Products Analysis Application</h1>", unsafe_allow_html=True)
@@ -177,7 +223,7 @@ def display_main_application_content():
     selected_generic_names = []   
 
     # Sidebar for navigation
-    menu = ['Data Overview', 'Market Analysis', 'Manufacturer Analysis', 'FDA Orange Book Analysis', 'Patient-flow Forecast', 'Drug Classification Analysis', 'Drugs with no Competition']
+    menu = ['Data Overview', 'Market Analysis', 'Manufacturer Analysis', 'FDA Orange Book Analysis', 'Patient-flow Forecast', 'Drug Classification Analysis', 'Drugs with no Competition', 'Top Pharma Companies Sales']
     choice = st.sidebar.radio("Menu", menu)
     
     # File uploader
@@ -203,9 +249,6 @@ def display_main_application_content():
             else:
                 st.error("The 'Manufacturers' column is missing from the uploaded data.")
 
-            # Generic Name (Product) Filter
-#             st.write(data.columns)  # Add this line to check the column names
-#             data.columns = data.columns.str.strip()
             data.columns = [str(col).strip() for col in data.columns]
             product_options = ['All Products'] + sorted(data['Generic Name'].dropna().unique().tolist())
             selected_product = st.selectbox('Select Generic Name', product_options, index=0)
@@ -264,12 +307,6 @@ def display_main_application_content():
             csv = convert_df_to_csv(filtered_data)
             st.download_button(label="Download Filtered Data as CSV", data=csv, file_name='filtered_data.csv', mime='text/csv')
                                  
-            #  Fuzzy matching
-            if 'fuzzy_matched_data' not in st.session_state:
-                st.session_state.fuzzy_matched_data = pd.DataFrame()
-            if 'atc_level_data' not in st.session_state:
-                st.session_state.atc_level_data = pd.DataFrame()
-                
             #  Fuzzy matching and ATC Code Extraction
             st.subheader("Data Processing with Fuzzy Matching and ATC Code Extraction")
 
@@ -292,7 +329,7 @@ def display_main_application_content():
             atc_index = None
             mcaz_register = None
             
-           # Process data only if files are uploaded and fuzzy_matched_data is empty
+            # Process data only if files are uploaded and fuzzy_matched_data is empty
             if mcaz_register_file and atc_index_file and st.session_state.fuzzy_matched_data.empty:
                 with st.spinner('Processing and mapping data...'):
                     start_time = datetime.now(harare_timezone)  # Capture start time
@@ -308,26 +345,31 @@ def display_main_application_content():
 
                     # Fuzzy Matching Logic with Corrected DataFrame Assignment
                     name_to_atc_code = dict(zip(atc_index['Name'], atc_index['ATCCode']))
+                    
+                    # Assuming mcaz_register and atc_index have been loaded and total_rows has been defined
+                    progress = 0
+                    progress_increment = 100 / total_rows  # Calculate the increment for each row processed
 
-                    # Define the fuzzy_match_and_update function as previously described
-                    def fuzzy_match_and_update(row):
+                    for index, row in mcaz_register.iterrows():
+                        # Perform fuzzy matching for the row
                         match_result = process.extractOne(row['Generic Name'], atc_index['Name'])
                         if match_result:
-                            # Use a more flexible approach to unpack, expecting at least two values
                             best_match_name, match_score = match_result[0], match_result[1]
                         else:
-                            # Provide default values in case no match is found
                             best_match_name, match_score = None, 0
-                        
-                        # Use .get() with a default of None if best_match_name is not in name_to_atc_code
+
                         atc_code = name_to_atc_code.get(best_match_name, None)
                         
-                        return pd.Series([best_match_name, match_score, atc_code])
+                        # Update the DataFrame row
+                        mcaz_register.at[index, 'Best Match Name'] = best_match_name
+                        mcaz_register.at[index, 'Match Score'] = match_score
+                        mcaz_register.at[index, 'ATCCode'] = atc_code
+                        
+                        # Update progress and the progress bar
+                        progress += progress_increment
+                        progress_bar.progress(min(int(progress), 100))
 
-                    # Apply function and update DataFrame
-                    mcaz_register[['Best Match Name', 'Match Score', 'ATCCode']] = mcaz_register.apply(fuzzy_match_and_update, axis=1, result_type='expand')
-
-                    # Complete progress bar
+                    # Ensure the final progress is set to 100%
                     progress_bar.progress(100)
 
                     # Update the session state
@@ -340,36 +382,6 @@ def display_main_application_content():
                     processing_time = end_time - start_time
                     st.write(f"Processing Time: {processing_time}")
 
-              # Process data only if files are uploaded and fuzzy_matched_data is empty
-#             if mcaz_register_file and atc_index_file and st.session_state.fuzzy_matched_data.empty:
-#                 with st.spinner('Processing and mapping data...'):
-#                     start_time = datetime.now(harare_timezone)  # Capture start time
-#                     st.write(f"Start Time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")  # Optionally display the start time
-
-#                     # Load the two files
-#                     mcaz_register = pd.read_csv(mcaz_register_file)
-#                     atc_index = pd.read_csv(atc_index_file)
-
-#                     # Fuzzy Matching Logic
-#                     name_to_atc_code = dict(zip(atc_index['Name'], atc_index['ATCCode']))
-#                     mcaz_register['Best Match Name'] = mcaz_register['Generic Name'].apply(
-#                         lambda x: process.extractOne(x, atc_index['Name'])[0]
-#                     )
-#                     mcaz_register['Match Score'] = mcaz_register['Generic Name'].apply(
-#                         lambda x: process.extractOne(x, atc_index['Name'])[1]
-#                     )
-#                     mcaz_register['ATCCode'] = mcaz_register['Best Match Name'].map(name_to_atc_code)
-
-#                     # Update the session state
-#                     st.session_state.fuzzy_matched_data = mcaz_register
-
-#                     end_time = datetime.now(harare_timezone)  # Capture end time
-#                     st.write(f"End Time: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")  # Optionally display the end time
-
-#                     # Calculate and display processing time
-#                     processing_time = end_time - start_time
-#                     st.write(f"Processing Time: {processing_time}")
-            
             # Display the processed data only if it exists in session state
             if 'fuzzy_matched_data' in st.session_state and not st.session_state.fuzzy_matched_data.empty:
                 st.write("Updated MCAZ Register with Fuzzy Matching and ATC Codes:")
@@ -378,7 +390,7 @@ def display_main_application_content():
                   # Perform further processing on the mcaz_register DataFrame
                 # Make sure to use the DataFrame from session state
                 mcaz_register = st.session_state.fuzzy_matched_data
-
+            
                 # Check if the DataFrame has the required columns before accessing them
                 required_columns = ['Generic Name', 'Strength', 'Form', 'Categories for Distribution', 'Manufacturers', 
                                     'Principal Name', 'Best Match Name', 'Match Score', 'ATCCode']
@@ -399,10 +411,9 @@ def display_main_application_content():
             else:
                 # Handle the case where 'csv' is None, e.g., display a message or take alternative action
                 print("No data available to convert to CSV")
-                    
-            
+          
             if mcaz_register is not None:
-                # Proceed only if mcaz_register is a DataFrame
+            # Proceed only if mcaz_register is a DataFrame
                 try:
                     mcaz_register = mcaz_register[['Generic Name', 'Strength', 'Form','Categories for Distribution','Manufacturers','Principal Name','Best Match Name', 'Match Score', 'ATCCode']]
                     # Rest of your code that works with mcaz_register
@@ -428,10 +439,8 @@ def display_main_application_content():
             else:
                 # Handle the case where mcaz_register is None
                 print("mcaz_register is None. Please check data loading and processing steps.")
-                         
-
-            # ATC Code Description Integration and Filtering
-            # Streamlit UI layout
+                
+            # Streamlit UI layout for ATC Code Description Integration and Filtering
             st.subheader("ATC Code Description Integration and Filtering")
 
             # Initialize variables for ATC data and filter variables
@@ -444,56 +453,45 @@ def display_main_application_content():
             atc_three_file = st.file_uploader("Upload ATC Level Three Description File", type=['csv'], key="atc_three_uploader")
             atc_four_file = st.file_uploader("Upload ATC Level Four Description File", type=['csv'], key="atc_four_uploader")
 
-            # Check if the data for merging is available in session state
-            if 'atc_level_data' in st.session_state and not st.session_state.atc_level_data.empty:
-                mcaz_register = st.session_state.atc_level_data
-                # ... [Merging logic]
-                merge_data = st.button("Merge Data")
+            # Button to trigger the merge operation
+            merge_data = st.button("Merge Data")
 
-                if merge_data:
-                    atc_one = safe_load_csv(atc_one_file)
-                    atc_two = safe_load_csv(atc_two_file)
-                    atc_three = safe_load_csv(atc_three_file)
-                    atc_four = safe_load_csv(atc_four_file)
+            if merge_data and 'fuzzy_matched_data' in st.session_state and not st.session_state.fuzzy_matched_data.empty:
+                # Load ATC description files if uploaded
+                atc_one = safe_load_csv(atc_one_file) if atc_one_file else None
+                atc_two = safe_load_csv(atc_two_file) if atc_two_file else None
+                atc_three = safe_load_csv(atc_three_file) if atc_three_file else None
+                atc_four = safe_load_csv(atc_four_file) if atc_four_file else None
+              
+                # Retrieve the fuzzy_matched_data from session state
+                mcaz_register =  st.session_state.atc_level_data
 
-                    # Retrieve mcaz_register from session state
-                    mcaz_register = st.session_state.atc_level_data
+                # Merge with ATC level descriptions
+                with st.spinner('Merging data with ATC level descriptions...'):
+                    if atc_one is not None and 'ATCLevelOneCode' in mcaz_register.columns:
+                        mcaz_register = mcaz_register.merge(atc_one, on='ATCLevelOneCode', how='left')
+                    if atc_two is not None and 'ATCLevelTwoCode' in mcaz_register.columns:
+                        mcaz_register = mcaz_register.merge(atc_two, on='ATCLevelTwoCode', how='left')
+                    if atc_three is not None and 'ATCLevelThreeCode' in mcaz_register.columns:
+                        mcaz_register = mcaz_register.merge(atc_three, on='ATCLevelThreeCode', how='left')
+                    if atc_four is not None and 'ATCLevelFourCode' in mcaz_register.columns:
+                        mcaz_register = mcaz_register.merge(atc_four, on='ATCLevelFourCode', how='left')
 
-                    # Merge with ATC level descriptions
-                    with st.spinner('Merging data with ATC level descriptions...'):
-                        if atc_one is not None and 'ATCLevelOneCode' in mcaz_register.columns:
-                            mcaz_register = mcaz_register.merge(atc_one, on='ATCLevelOneCode', how='left')
-                        if atc_two is not None and 'ATCLevelTwoCode' in mcaz_register.columns:
-                            mcaz_register = mcaz_register.merge(atc_two, on='ATCLevelTwoCode', how='left')
-                        if atc_three is not None and 'ATCLevelThreeCode' in mcaz_register.columns:
-                            mcaz_register = mcaz_register.merge(atc_three, on='ATCLevelThreeCode', how='left')
-                        if atc_four is not None and 'ATCLevelFourCode' in mcaz_register.columns:
-                            mcaz_register = mcaz_register.merge(atc_four, on='ATCLevelFourCode', how='left')
-
-                    # Transform the relevant columns to upper case
-                    # Replace 'Column1', 'Column2', etc., with the actual column names you want to transform
-                    columns_to_uppercase = ['Generic Name']  # Add your column names here
-
-                    for col in columns_to_uppercase:
-                        if col in mcaz_register.columns:
-                            mcaz_register[col] = mcaz_register[col].str.upper()
-
-                    # Update session state with the merged data
-                    st.session_state['mcaz_with_ATCCodeDescription'] = mcaz_register
-
-                    # Option 1: Remove complete duplicates
-                    mcaz_register = mcaz_register.drop_duplicates()
-
+                # Correctly update the session state with the merged data
+                st.session_state['mcaz_with_ATCCodeDescription'] = mcaz_register
+                st.success("Data merged with ATC level descriptions.")
+                
                 # Display the merged dataframe
                 if not mcaz_register.empty:
                     st.write("Merged Data:")
                     st.dataframe(mcaz_register)
                 else:
                     st.write("No data to display after merging.")
-                
+
+           
             else:
-                st.warning("Please complete the fuzzy matching process first.")
-                
+                st.warning("Please complete the fuzzy matching process and ensure ATC level description files are uploaded and merged.")
+            
             # Download file
             csv = convert_df_to_csv(mcaz_register)
             if csv is not None:
@@ -524,9 +522,9 @@ def display_main_application_content():
                 else:
                     st.write("No filter applied.")
 
-            # Download file option
-            csv = convert_df_to_csv(filtered_data)
-            st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_filtered.csv', mime='text/csv', key='download_mcaz_register_filtered')
+                    # Download file option
+                    csv = convert_df_to_csv(filtered_data)
+                    st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_filtered.csv', mime='text/csv', key='download_mcaz_register_filtered')
 
             # Filter data based on local manufacturer or importer for selected type
             st.subheader("Data Filtering Based on User Type and Selected Filter")
@@ -567,7 +565,7 @@ def display_main_application_content():
                     # Apply additional filter if selection is not 'None'
                     if selected_filter != "None":
                         filter_values = sorted(mcaz_register[selected_filter].astype(str).unique())
-                        selected_values = st.multiselect(f"Select {selected_filter}", filter_values)
+                        selected_values = st.multiselect(f"Select {selected_filter}", filter_values, key = "valid")
 
                         if selected_values:
                             mcaz_register = mcaz_register[mcaz_register[selected_filter].astype(str).isin(selected_values)]
@@ -589,8 +587,7 @@ def display_main_application_content():
             else:
                 # Handle the case where 'csv' is None, e.g., display a message or take alternative action
                 print("No data available to convert to CSV")
-
-
+        
         # Market Analysis
         elif choice == 'Market Analysis':
             st.subheader('Market Analysis')
@@ -714,7 +711,7 @@ def display_main_application_content():
                 if not filtered_counts.empty:
                     csv = filtered_counts.to_csv(index=False)
                     st.download_button("Download Unique Products Data", csv, "unique_products_data.csv", "text/csv", key='download-unique-product')
-
+                    
         # Manufacturer Analysis
         elif choice == 'Manufacturer Analysis':
             st.subheader('Manufacturer Analysis')
@@ -969,7 +966,7 @@ def display_main_application_content():
             else:
                 st.write("ATC Code Description data is not available.")
 
-        # FDA Orange Bookd Analysis
+        # FDA Orange Book Analysis
         elif choice == 'FDA Orange Book Analysis':
             st.title("FDA Orange Book Analysis")
 
@@ -1173,6 +1170,101 @@ def display_main_application_content():
                     st.write("Please upload a file.")
             else:
                 st.write("Select 'Human Medicine' to access FDA drugs analysis.")
+                
+        # Top Phamra Companies Word wide Sales
+        elif choice == 'Top Pharma Companies Sales':
+            st.subheader('Top Pharma Companies World Sales') 
+         
+            if 'df' not in st.session_state:
+                st.session_state.df = pd.DataFrame()
+            
+            # Usage in Streamlit
+            uploaded_file = st.file_uploader("Upload your sales data CSV file", type=["csv"])
+            if uploaded_file is not None:
+                st.session_state.df = load_data_sales(uploaded_file)
+                
+                # Check if the DataFrame is not empty
+                if not st.session_state.df.empty:
+
+                    # Setting up the filters
+                    st.subheader('Filter Options')
+                    # Proceed with processing the DataFrame
+                    # Company Name Filter
+                    company_list = ['All'] + sorted(st.session_state.df['Company Name'].unique().tolist())
+                    company_name = st.selectbox('Company Name', company_list)
+
+                    # Product Name Filter
+                    product_list = ['All'] + sorted(st.session_state.df['Product Name'].unique().tolist())
+                    product_name = st.selectbox('Product Name', product_list)
+
+                    # Active Ingredient Filter
+                    ingredient_list = ['All'] + sorted(st.session_state.df['Active Ingredient'].fillna('Unknown').astype(str).unique().tolist())
+                    active_ingredient = st.selectbox('Active Ingredient', ingredient_list)
+
+                    # Main Therapeutic Indication Filter
+                    indication_list = ['All'] + sorted(st.session_state.df['Main Therapeutic Indication'].fillna('Unknown').astype(str).unique().tolist())
+                    therapeutic_indication = st.selectbox('Main Therapeutic Indication', indication_list)
+
+                    # Product Classification Filter
+                    classification_list = ['All'] + sorted(st.session_state.df['Product Classification'].fillna('Unknown').astype(str).unique().tolist())
+                    product_classification = st.selectbox('Product Classification', classification_list)
+                    
+                    # Assuming df is your DataFrame after applying filters
+                    if not st.session_state.df.empty:
+                        # Sorting options with corrected column names
+                        sort_column = st.selectbox(
+                            'Sort by', 
+                            ['2022 Revenue in Millions USD', '2021 Revenue in Millions USD'],  # Corrected column names
+                            index=0  # default selection
+                        )
+
+                        sort_order = st.selectbox(
+                            'Sort order', 
+                            ['Ascending', 'Descending'], 
+                            index=1  # default to Descending
+                        )
+
+                        # Convert sort order to boolean (True for Ascending, False for Descending)
+                        is_ascending = sort_order == 'Ascending'
+
+
+                    # Filtering the data
+                    filtered_df = st.session_state.df
+                    if company_name != 'All':
+                        filtered_df = filtered_df[filtered_df['Company Name'] == company_name]
+                    if product_name != 'All':
+                        filtered_df = filtered_df[filtered_df['Product Name'] == product_name]
+                    if active_ingredient != 'All':
+                        filtered_df = filtered_df[filtered_df['Active Ingredient'] == active_ingredient]
+                    if therapeutic_indication != 'All':
+                        filtered_df = filtered_df[filtered_df['Main Therapeutic Indication'] == therapeutic_indication]
+                    if product_classification != 'All':
+                        filtered_df = filtered_df[filtered_df['Product Classification'] == product_classification]
+
+                    # Displaying the filtered dataframe
+                    if not filtered_df.empty:
+                        # Sort filtered_df by selected column and order
+                        filtered_df = filtered_df.sort_values(by=sort_column, ascending=is_ascending)
+
+                        # Display the sorted and filtered dataframe
+                        st.write(filtered_df)
+                    else:
+                        st.write("No data to display after filtering.")
+
+                    # st.write(filtered_df)
+                    
+                    # Convert the complete DataFrame to CSV
+                    csv_data = convert_df_to_csv(filtered_df)
+                    st.download_button(
+                        label="Download data as CSV",
+                        data=csv_data,
+                        file_name='world_pharma_sales.csv',
+                        mime='text/csv',
+                    )
+
+                else:
+                    # Display a message if the DataFrame is empty
+                    st.write("Please upload a sales data CSV file to get started.")
 
     else:
         st.warning('Please upload MCAZ Register CSV file.')
@@ -1191,7 +1283,9 @@ def main():
     if password_guess == st.secrets["password"]:
         try:
             # Correctly using datetime.strptime now
+            # expiration_date = st.secrets["expiration_date"]
             expiration_date = datetime.strptime(st.secrets["expiration_date"], "%d-%m-%Y")
+#             expiration_date = dt.strptime(st.secrets["expiration_date"], "%d-%m-%Y")
         except Exception as e:
             st.error(f"Error parsing expiration date: {e}")
             st.stop()
