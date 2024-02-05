@@ -329,45 +329,46 @@ def display_main_application_content():
             atc_index = None
             mcaz_register = None
             
+            ##
+            
+
             # Process data only if files are uploaded and fuzzy_matched_data is empty
-            if mcaz_register_file and atc_index_file and st.session_state.fuzzy_matched_data.empty:
+            if mcaz_register_file and atc_index_file and st.session_state.get('fuzzy_matched_data', pd.DataFrame()).empty:
                 with st.spinner('Processing and mapping data...'):
                     start_time = datetime.now(harare_timezone)  # Capture start time
                     st.write(f"Start Time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")  # Optionally display the start time
 
-                    # Load the two files
+                    # Load the two files (consider caching these operations if they're expensive and inputs don't change often)
                     mcaz_register = pd.read_csv(mcaz_register_file)
                     atc_index = pd.read_csv(atc_index_file)
 
                     # Initialize progress bar
                     progress_bar = st.progress(0)
                     total_rows = len(mcaz_register)
-
-                    # Fuzzy Matching Logic with Corrected DataFrame Assignment
+                    batch_size = 100  # Update progress bar every 100 rows, adjust based on your dataset size
                     name_to_atc_code = dict(zip(atc_index['Name'], atc_index['ATCCode']))
-                    
-                    # Assuming mcaz_register and atc_index have been loaded and total_rows has been defined
-                    progress = 0
-                    progress_increment = 100 / total_rows  # Calculate the increment for each row processed
 
+                    # for index, row in enumerate(mcaz_register.itertuples(), 1):
                     for index, row in mcaz_register.iterrows():
                         # Perform fuzzy matching for the row
                         match_result = process.extractOne(row['Generic Name'], atc_index['Name'])
+                        # match_result = process.extractOne(row.Generic_Name, atc_index['Name'])
                         if match_result:
                             best_match_name, match_score = match_result[0], match_result[1]
                         else:
                             best_match_name, match_score = None, 0
 
                         atc_code = name_to_atc_code.get(best_match_name, None)
-                        
+
                         # Update the DataFrame row
                         mcaz_register.at[index, 'Best Match Name'] = best_match_name
                         mcaz_register.at[index, 'Match Score'] = match_score
                         mcaz_register.at[index, 'ATCCode'] = atc_code
-                        
-                        # Update progress and the progress bar
-                        progress += progress_increment
-                        progress_bar.progress(min(int(progress), 100))
+
+                        # Update progress bar less frequently
+                        if index % batch_size == 0 or index == total_rows:
+                            progress = (index / total_rows) * 100
+                            progress_bar.progress(int(progress))
 
                     # Ensure the final progress is set to 100%
                     progress_bar.progress(100)
@@ -381,6 +382,61 @@ def display_main_application_content():
                     # Calculate and display processing time
                     processing_time = end_time - start_time
                     st.write(f"Processing Time: {processing_time}")
+
+                    ##
+                
+                # # Process data only if files are uploaded and fuzzy_matched_data is empty
+                # if mcaz_register_file and atc_index_file and st.session_state.fuzzy_matched_data.empty:
+                #     with st.spinner('Processing and mapping data...'):
+                #         start_time = datetime.now(harare_timezone)  # Capture start time
+                #         st.write(f"Start Time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")  # Optionally display the start time
+
+                #         # Load the two files
+                #         mcaz_register = pd.read_csv(mcaz_register_file)
+                #         atc_index = pd.read_csv(atc_index_file)
+
+                #         # Initialize progress bar
+                #         progress_bar = st.progress(0)
+                #         total_rows = len(mcaz_register)
+
+                #         # Fuzzy Matching Logic with Corrected DataFrame Assignment
+                #         name_to_atc_code = dict(zip(atc_index['Name'], atc_index['ATCCode']))
+                        
+                #         # Assuming mcaz_register and atc_index have been loaded and total_rows has been defined
+                #         progress = 0
+                #         progress_increment = 100 / total_rows  # Calculate the increment for each row processed
+
+                    # for index, row in mcaz_register.iterrows():
+                    #     # Perform fuzzy matching for the row
+                    #     match_result = process.extractOne(row['Generic Name'], atc_index['Name'])
+                    #     if match_result:
+                    #         best_match_name, match_score = match_result[0], match_result[1]
+                    #     else:
+                    #         best_match_name, match_score = None, 0
+
+                    #     atc_code = name_to_atc_code.get(best_match_name, None)
+                        
+                    #     # Update the DataFrame row
+                    #     mcaz_register.at[index, 'Best Match Name'] = best_match_name
+                    #     mcaz_register.at[index, 'Match Score'] = match_score
+                    #     mcaz_register.at[index, 'ATCCode'] = atc_code
+                        
+                    #     # Update progress and the progress bar
+                    #     progress += progress_increment
+                    #     progress_bar.progress(min(int(progress), 100))
+
+                    # # Ensure the final progress is set to 100%
+                    # progress_bar.progress(100)
+
+                    # # Update the session state
+                    # st.session_state.fuzzy_matched_data = mcaz_register
+
+                    # end_time = datetime.now(harare_timezone)  # Capture end time
+                    # st.write(f"End Time: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")  # Optionally display the end time
+
+                    # # Calculate and display processing time
+                    # processing_time = end_time - start_time
+                    # st.write(f"Processing Time: {processing_time}")
 
             # Display the processed data only if it exists in session state
             if 'fuzzy_matched_data' in st.session_state and not st.session_state.fuzzy_matched_data.empty:
@@ -406,7 +462,7 @@ def display_main_application_content():
             csv = convert_df_to_csv(mcaz_register)
             if csv is not None:
                 # Proceed with operations that use 'csv'
-                st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register.csv', mime='text/csv', key='download_mcaz_withcodes')
+                st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_with_atc_codes.csv', mime='text/csv', key='download_mcaz_withcodes')
 
             else:
                 # Handle the case where 'csv' is None, e.g., display a message or take alternative action
@@ -432,7 +488,7 @@ def display_main_application_content():
 
                         # Download file
                         csv = convert_df_to_csv(st.session_state.atc_level_data)
-                        st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register.csv', mime='text/csv', key ='download_updated_register')
+                        st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_with_ATC_Level_Codes.csv', mime='text/csv', key ='download_updated_register')
                 except KeyError as e:
                     # Handle the case where one or more columns are missing
                     print(f"Column not found in DataFrame: {e}")
@@ -496,7 +552,7 @@ def display_main_application_content():
             csv = convert_df_to_csv(mcaz_register)
             if csv is not None:
                 # Proceed with operations that use 'csv'
-                st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register.csv', mime='text/csv', key='download_mcaz_withatcdescription')
+                st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_with_atc_description.csv', mime='text/csv', key='download_mcaz_withatcdescription')
 
             else:
                 # Handle the case where 'csv' is None, e.g., display a message or take alternative action
@@ -582,7 +638,7 @@ def display_main_application_content():
             csv = convert_df_to_csv(mcaz_register)
             if csv is not None:
                 # Proceed with operations that use 'csv'
-                st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register.csv', mime='text/csv', key='download_mcaz_filtered')
+                st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_prohibited_medicine.csv', mime='text/csv', key='download_mcaz_filtered')
 
             else:
                 # Handle the case where 'csv' is None, e.g., display a message or take alternative action
