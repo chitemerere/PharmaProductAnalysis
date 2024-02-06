@@ -11,6 +11,7 @@ import hashlib
 import datetime
 from zoneinfo import ZoneInfo
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from fuzzywuzzy import process
@@ -121,16 +122,6 @@ def filter_data_for_user(user_type, merged_data, prohibited_list):
         filtered_data = merged_data
     
     return filtered_data
-
-
-# def filter_data_for_user(user_type, merged_data, prohibited_list):
-#     if user_type == 'Importer':
-#         # Filter out prohibited generics for importers
-#         filtered_data = merged_data[~merged_data['Generic Name'].isin(prohibited_list['Generic Name'])]
-#     else:
-#         # Local Manufacturer gets the full data
-#         filtered_data = merged_data
-#     return filtered_data
 
 def apply_mutually_exclusive_filters(data, filters):
     for key, selected in filters.items():
@@ -329,9 +320,6 @@ def display_main_application_content():
             atc_index = None
             mcaz_register = None
             
-            ##
-            
-
             # Process data only if files are uploaded and fuzzy_matched_data is empty
             if mcaz_register_file and atc_index_file and st.session_state.get('fuzzy_matched_data', pd.DataFrame()).empty:
                 with st.spinner('Processing and mapping data...'):
@@ -348,7 +336,6 @@ def display_main_application_content():
                     batch_size = 100  # Update progress bar every 100 rows, adjust based on your dataset size
                     name_to_atc_code = dict(zip(atc_index['Name'], atc_index['ATCCode']))
 
-                    # for index, row in enumerate(mcaz_register.itertuples(), 1):
                     for index, row in mcaz_register.iterrows():
                         # Perform fuzzy matching for the row
                         match_result = process.extractOne(row['Generic Name'], atc_index['Name'])
@@ -382,61 +369,6 @@ def display_main_application_content():
                     # Calculate and display processing time
                     processing_time = end_time - start_time
                     st.write(f"Processing Time: {processing_time}")
-
-                    ##
-                
-                # # Process data only if files are uploaded and fuzzy_matched_data is empty
-                # if mcaz_register_file and atc_index_file and st.session_state.fuzzy_matched_data.empty:
-                #     with st.spinner('Processing and mapping data...'):
-                #         start_time = datetime.now(harare_timezone)  # Capture start time
-                #         st.write(f"Start Time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")  # Optionally display the start time
-
-                #         # Load the two files
-                #         mcaz_register = pd.read_csv(mcaz_register_file)
-                #         atc_index = pd.read_csv(atc_index_file)
-
-                #         # Initialize progress bar
-                #         progress_bar = st.progress(0)
-                #         total_rows = len(mcaz_register)
-
-                #         # Fuzzy Matching Logic with Corrected DataFrame Assignment
-                #         name_to_atc_code = dict(zip(atc_index['Name'], atc_index['ATCCode']))
-                        
-                #         # Assuming mcaz_register and atc_index have been loaded and total_rows has been defined
-                #         progress = 0
-                #         progress_increment = 100 / total_rows  # Calculate the increment for each row processed
-
-                    # for index, row in mcaz_register.iterrows():
-                    #     # Perform fuzzy matching for the row
-                    #     match_result = process.extractOne(row['Generic Name'], atc_index['Name'])
-                    #     if match_result:
-                    #         best_match_name, match_score = match_result[0], match_result[1]
-                    #     else:
-                    #         best_match_name, match_score = None, 0
-
-                    #     atc_code = name_to_atc_code.get(best_match_name, None)
-                        
-                    #     # Update the DataFrame row
-                    #     mcaz_register.at[index, 'Best Match Name'] = best_match_name
-                    #     mcaz_register.at[index, 'Match Score'] = match_score
-                    #     mcaz_register.at[index, 'ATCCode'] = atc_code
-                        
-                    #     # Update progress and the progress bar
-                    #     progress += progress_increment
-                    #     progress_bar.progress(min(int(progress), 100))
-
-                    # # Ensure the final progress is set to 100%
-                    # progress_bar.progress(100)
-
-                    # # Update the session state
-                    # st.session_state.fuzzy_matched_data = mcaz_register
-
-                    # end_time = datetime.now(harare_timezone)  # Capture end time
-                    # st.write(f"End Time: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")  # Optionally display the end time
-
-                    # # Calculate and display processing time
-                    # processing_time = end_time - start_time
-                    # st.write(f"Processing Time: {processing_time}")
 
             # Display the processed data only if it exists in session state
             if 'fuzzy_matched_data' in st.session_state and not st.session_state.fuzzy_matched_data.empty:
@@ -767,7 +699,35 @@ def display_main_application_content():
                 if not filtered_counts.empty:
                     csv = filtered_counts.to_csv(index=False)
                     st.download_button("Download Unique Products Data", csv, "unique_products_data.csv", "text/csv", key='download-unique-product')
+            
+            # Streamlit widget to upload the Prohibited Medicines file
+            uploaded_prohibited_file = st.file_uploader("Upload Prohibited Medicines file", type=['csv'])
+
+            # Assuming you have a variable to capture the user type
+            user_type = st.selectbox('Select User Type', ['None', 'Importer', 'Local Manufacturer'])
+
+            if uploaded_prohibited_file is not None:
+                # Load the Prohibited Medicines file
+                prohibited_medicines_df = pd.read_csv(uploaded_prohibited_file)
+                
+                # Convert column names to uppercase to match the MCAZ Register
+                prohibited_medicines_df.columns = prohibited_medicines_df.columns.str.upper()
+                
+                # Combine 'GENERIC NAME', 'STRENGTH', and 'FORM' to match the 'Combined' format in your data dataframe
+                prohibited_medicines_df['COMBINED'] = prohibited_medicines_df['GENERIC NAME'] + " - " + prohibited_medicines_df['STRENGTH'].astype(str) + " - " + prohibited_medicines_df['FORM']
+                
+                # Example to integrate the prohibited medicines filter based on the user type
+                if user_type == 'Importer':
+                    # Assuming 'filtered_counts' is already defined in your code with the counts of unique products
+                    # First, ensure 'filtered_counts' is in a format that can be filtered (e.g., a DataFrame)
                     
+                    # Exclude prohibited medicines for importers
+                    prohibited_list = prohibited_medicines_df['COMBINED'].tolist()
+                    filtered_counts = filtered_counts[~filtered_counts.index.isin(prohibited_list)]
+                    
+                    # Display the filtered 'filtered_counts' DataFrame
+                    st.write(filtered_counts)
+           
         # Manufacturer Analysis
         elif choice == 'Manufacturer Analysis':
             st.subheader('Manufacturer Analysis')
@@ -1166,7 +1126,81 @@ def display_main_application_content():
             # Display the total count of products
             total_products = len(mcaz_register)
             st.write(f"Total Count of Products: {total_products}")
+            
+            # Summary of Categories for Distribution
+            def summarize_categories_by_principal(mcaz_register):
+                st.subheader("Summary of Categories for Distribution by Principal")
 
+                # Check for necessary columns
+                required_columns = ['Principal Name', 'Categories for Distribution', 'Date Registered']
+                if not all(col in mcaz_register.columns for col in required_columns):
+                    st.error("Uploaded data does not contain the required columns.")
+                    return
+
+                # Preprocess data
+                data = mcaz_register.dropna(subset=required_columns)
+                data['Year'] = pd.to_datetime(data['Date Registered'], errors='coerce').dt.year
+
+                # Principal selection
+                principal_names = ['All'] + sorted(data['Principal Name'].unique())
+                selected_principal = st.selectbox('Select Principal Name', principal_names)
+
+                # Filter data
+                if selected_principal != 'All':
+                    filtered_data = data[data['Principal Name'] == selected_principal]
+                else:
+                    filtered_data = data
+
+                # Initial summary
+                total_product_count = filtered_data.shape[0]
+                category_counts = filtered_data['Categories for Distribution'].value_counts().reset_index(name='Count')
+                category_counts['% Total'] = (category_counts['Count'] / total_product_count) * 100
+                category_counts.columns = ['Category', 'Count', '% Total']
+
+                # Display initial summary
+                if not category_counts.empty:
+                    st.write(f"Initial Summary for {selected_principal}:")
+                    st.dataframe(category_counts.style.format({'% Total': "{:.2f}%"}))
+                    st.markdown(f"**Total Product Count:** {total_product_count}")
+
+                # Detailed yearly summary
+                st.write(f"Yearly Summary for {selected_principal}:")
+
+                # Group and calculate counts and percentages
+                grouped = filtered_data.groupby(['Categories for Distribution', 'Year']).size().reset_index(name='Count')
+                total_counts_by_year = filtered_data.groupby(['Year', 'Categories for Distribution']).size().groupby(level=0).sum().reset_index(name='TotalYearCount')
+
+                # Merge for percentages
+                summary = pd.merge(grouped, total_counts_by_year, on='Year')
+                summary['% Total'] = (summary['Count'] / summary['TotalYearCount']) * 100
+
+                # Pivot for yearly summary with specific formatting
+                pivot_df = summary.pivot_table(index='Categories for Distribution', columns='Year', values=['Count', '% Total'], aggfunc='first')
+
+                # Create multi-level columns for each year with "Total Count" and "% For the Year"
+                pivot_df.columns = pivot_df.columns.map('{0[0]} {0[1]}'.format)
+                pivot_df = pivot_df.sort_index(axis=1, level=1)
+
+                # Rearrange columns to have "Count" and "% Total" next to each other for each year
+                new_order = []
+                years = np.unique([col.split(' ')[-1] for col in pivot_df.columns])
+                for year in sorted(years, key=int):
+                    new_order.extend(sorted([col for col in pivot_df.columns if year in col], key=lambda x: x.split()[0], reverse=True))
+                pivot_df = pivot_df[new_order]
+
+                # Format percentages to two decimal places
+                for col in pivot_df.columns:
+                    if "% Total" in col:
+                        pivot_df[col] = pivot_df[col].map("{:.2f}%".format)
+
+                # Display the formatted pivot table
+                if not pivot_df.empty:
+                    st.dataframe(pivot_df)
+                else:
+                    st.write("No yearly data available.")
+        
+            summarize_categories_by_principal(mcaz_register)
+        
         # Drugs with No Patents and NO Competition Analysis
         elif choice == 'Drugs with no Competition':
             st.subheader('FDA Drugs with No Patents and No Competition')
