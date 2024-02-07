@@ -26,6 +26,16 @@ import logging
 # Specify the timezone for Harare
 harare_timezone = ZoneInfo("Africa/Harare")
 
+# Initialize session state variables at the start
+if 'start_time' not in st.session_state:
+    st.session_state['start_time'] = None
+if 'end_time' not in st.session_state:
+    st.session_state['end_time'] = None
+if 'processed_rows' not in st.session_state:
+    st.session_state['processed_rows'] = 0
+if 'fuzzy_matched_data' not in st.session_state:
+    st.session_state['fuzzy_matched_data'] = pd.DataFrame()
+
 def safe_load_csv(uploaded_file):
     if uploaded_file is not None and uploaded_file.size > 0:
         return pd.read_csv(uploaded_file)
@@ -180,6 +190,7 @@ def filter_dataframe(df, column, value):
     return df
 
 # Function to load data from an uploaded file
+@st.cache_data
 def load_data_sales(uploaded_file):
     if uploaded_file is not None:
         try:
@@ -219,14 +230,10 @@ def init_columns(df):
     return df
 
 def process_data(mcaz_register, atc_index, extract_atc_levels):
-    if 'start_time' not in st.session_state:
-        with st.spinner('Processing and mapping data...'):
-            st.session_state.start_time = datetime.now(harare_timezone)
-            st.write(f"Processing started at: {st.session_state.start_time.strftime('%Y-%m-%d %H:%M:%S')}")
-        
-        # Make sure to set end_time as soon as processing is done
-        st.session_state['end_time'] = datetime.now(harare_timezone)
-        
+     # Ensure start_time is set at the beginning of processing
+    if 'start_time' not in st.session_state or st.session_state.start_time is None:
+        st.session_state.start_time = datetime.now(harare_timezone)  # or datetime.now(harare_timezone) if timezone is relevant
+    
     # Ensure 'Name' in ATC index is string
     atc_index['Name'] = atc_index['Name'].astype(str)
 
@@ -240,6 +247,7 @@ def process_data(mcaz_register, atc_index, extract_atc_levels):
     # Initialize progress bar and display processing message
     progress_bar = st.progress(0)
     st.subheader('Processing and mapping data...')
+    st.session_state.start_time = datetime.now(harare_timezone) 
 
     for index, row in mcaz_register.iloc[processed_rows:].iterrows():
         # Processing logic (omitted for brevity)
@@ -266,10 +274,68 @@ def process_data(mcaz_register, atc_index, extract_atc_levels):
     # Finalize progress and display completion message
     progress_bar.progress(100)
     st.session_state.end_time = datetime.now(harare_timezone)
-    processing_time = st.session_state.end_time - st.session_state.start_time
-    st.write(f"Processing completed at: {st.session_state.end_time.strftime('%Y-%m-%d %H:%M:%S')}")
-    st.write(f"Total processing time: {processing_time}")
+    # Safely calculate processing time
+    if st.session_state.start_time is not None and st.session_state.end_time is not None:
+        processing_time = st.session_state.end_time - st.session_state.start_time
+        st.write(f"Processing completed at: {st.session_state.end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        st.write(f"Total processing time: {processing_time}")
+    else:
+        st.error("Processing time could not be calculated due to missing start or end time.")
     st.session_state.fuzzy_matched_data = mcaz_register  # Save processed data for later use
+
+
+# def process_data(mcaz_register, atc_index, extract_atc_levels):
+#     if 'start_time' not in st.session_state:
+#         with st.spinner('Processing and mapping data...'):
+#             st.session_state.start_time = datetime.now(harare_timezone)
+#             st.write(f"Processing started at: {st.session_state.start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        
+#         # Make sure to set end_time as soon as processing is done
+#         st.session_state['end_time'] = datetime.now(harare_timezone)
+        
+#     # Ensure 'Name' in ATC index is string
+#     atc_index['Name'] = atc_index['Name'].astype(str)
+
+#     name_to_atc_code = dict(zip(atc_index['Name'], atc_index['ATCCode']))
+#     total_rows = len(mcaz_register)
+#     processed_rows = st.session_state.get('processed_rows', 0)
+
+#     total_rows = len(mcaz_register)
+#     processed_rows = st.session_state.get('processed_rows', 0)
+
+#     # Initialize progress bar and display processing message
+#     progress_bar = st.progress(0)
+#     st.subheader('Processing and mapping data...')
+
+#     for index, row in mcaz_register.iloc[processed_rows:].iterrows():
+#         # Processing logic (omitted for brevity)
+#         if not st.session_state.get('resume_processing', True):
+#             break  # Pause processing
+        
+#         match_result = process.extractOne(row['Generic Name'], atc_index['Name'], scorer=fuzz.ratio)
+#         best_match_name, match_score = match_result[0], match_result[1] if match_result else (None, 0)
+#         atc_code = name_to_atc_code.get(best_match_name, None)
+
+#         mcaz_register.at[index, 'Best Match Name'] = best_match_name
+#         mcaz_register.at[index, 'Match Score'] = match_score
+#         mcaz_register.at[index, 'ATCCode'] = atc_code
+
+#         progress = int(((index - processed_rows + 1) / (total_rows - processed_rows)) * 100)
+#         progress_bar.progress(progress)
+#         st.session_state.processed_rows = index + 1
+        
+#         # Update progress
+#         progress = int(((index - processed_rows + 1) / total_rows) * 100)
+#         progress_bar.progress(progress)
+#         st.session_state.processed_rows = index + 1
+
+#     # Finalize progress and display completion message
+#     progress_bar.progress(100)
+#     st.session_state.end_time = datetime.now(harare_timezone)
+#     processing_time = st.session_state.end_time - st.session_state.start_time
+#     st.write(f"Processing completed at: {st.session_state.end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+#     st.write(f"Total processing time: {processing_time}")
+#     st.session_state.fuzzy_matched_data = mcaz_register  # Save processed data for later use
 
 def display_main_application_content():
                         
@@ -408,8 +474,8 @@ def display_main_application_content():
                 for key in ['processed_rows', 'resume_processing', 'start_time', 'end_time', 'fuzzy_matched_data', 'atc_level_data']:
                     if key in st.session_state:
                         del st.session_state[key]
-                # st.rerun()
-                st.experimental_rerun()
+                st.rerun()
+                # st.experimental_rerun()
                 
             # Display the processed data only if it exists in session state
             if 'fuzzy_matched_data' in st.session_state and not st.session_state.fuzzy_matched_data.empty:
@@ -440,18 +506,20 @@ def display_main_application_content():
             else:
                 # Handle the case where 'csv' is None, e.g., display a message or take alternative action
                 print("No data available to convert to CSV")
-          
+                
             if mcaz_register is not None:
-            # Proceed only if mcaz_register is a DataFrame
                 try:
-                    mcaz_register = mcaz_register[['Generic Name', 'Strength', 'Form','Categories for Distribution','Manufacturers','Principal Name','Best Match Name', 'Match Score', 'ATCCode']]
-                    # Rest of your code that works with mcaz_register
-                    mcaz_register = mcaz_register.applymap(lambda x: x.upper() if isinstance(x, str) else x)
-                    # You can also save result_df to a CSV file or use it for further processing
+                    # Ensure only specific columns are considered
+                    mcaz_register = mcaz_register[['Generic Name', 'Strength', 'Form', 'Categories for Distribution', 'Manufacturers', 'Principal Name', 'Best Match Name', 'Match Score', 'ATCCode']]
 
-                    # Apply the function to each ATC code in the DataFrame
-                    mcaz_register[['ATCLevelOneCode', 'ATCLevelTwoCode', 'ATCLevelThreeCode', 'ATCLevelFourCode']] = \
-                        mcaz_register['ATCCode'].apply(lambda x: pd.Series(extract_atc_levels(x)))
+                    # Transform all string values in the DataFrame to uppercase
+                    for col in mcaz_register.columns:
+                        mcaz_register[col] = mcaz_register[col].apply(lambda x: x.upper() if isinstance(x, str) else x)
+
+                    # Extract ATC levels and update the DataFrame
+                    mcaz_register[['ATCLevelOneCode', 'ATCLevelTwoCode', 'ATCLevelThreeCode', 'ATCLevelFourCode']] = mcaz_register['ATCCode'].apply(
+                        lambda x: pd.Series(extract_atc_levels(x))
+                    )
 
                     st.session_state.atc_level_data = mcaz_register
 
@@ -459,15 +527,42 @@ def display_main_application_content():
                         st.write("Updated MCAZ Register with ATC Level Codes:")
                         st.dataframe(st.session_state.atc_level_data)
 
-                        # Download file
+                        # Function to convert DataFrame to CSV for download
                         csv = convert_df_to_csv(st.session_state.atc_level_data)
-                        st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_with_ATC_Level_Codes.csv', mime='text/csv', key ='download_updated_register')
+                        st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_with_ATC_Level_Codes.csv', mime='text/csv', key='download_updated_register')
                 except KeyError as e:
-                    # Handle the case where one or more columns are missing
-                    print(f"Column not found in DataFrame: {e}")
+                    st.error(f"Column not found in DataFrame: {e}")
             else:
-                # Handle the case where mcaz_register is None
-                print("mcaz_register is None. Please check data loading and processing steps.")
+                st.error("mcaz_register is None. Please check data loading and processing steps.")
+
+          
+            # if mcaz_register is not None:
+            # # Proceed only if mcaz_register is a DataFrame
+            #     try:
+            #         mcaz_register = mcaz_register[['Generic Name', 'Strength', 'Form','Categories for Distribution','Manufacturers','Principal Name','Best Match Name', 'Match Score', 'ATCCode']]
+            #         # Rest of your code that works with mcaz_register
+            #         mcaz_register = mcaz_register.applymap(lambda x: x.upper() if isinstance(x, str) else x)
+            #         # You can also save result_df to a CSV file or use it for further processing
+
+            #         # Apply the function to each ATC code in the DataFrame
+            #         mcaz_register[['ATCLevelOneCode', 'ATCLevelTwoCode', 'ATCLevelThreeCode', 'ATCLevelFourCode']] = \
+            #             mcaz_register['ATCCode'].apply(lambda x: pd.Series(extract_atc_levels(x)))
+
+            #         st.session_state.atc_level_data = mcaz_register
+
+            #         if not st.session_state.atc_level_data.empty:
+            #             st.write("Updated MCAZ Register with ATC Level Codes:")
+            #             st.dataframe(st.session_state.atc_level_data)
+
+            #             # Download file
+            #             csv = convert_df_to_csv(st.session_state.atc_level_data)
+            #             st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_with_ATC_Level_Codes.csv', mime='text/csv', key ='download_updated_register')
+            #     except KeyError as e:
+            #         # Handle the case where one or more columns are missing
+            #         print(f"Column not found in DataFrame: {e}")
+            # else:
+            #     # Handle the case where mcaz_register is None
+            #     print("mcaz_register is None. Please check data loading and processing steps.")
                 
             # Streamlit UI layout for ATC Code Description Integration and Filtering
             st.subheader("ATC Code Description Integration and Filtering")
