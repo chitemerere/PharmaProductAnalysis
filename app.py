@@ -64,15 +64,17 @@ def load_data(uploaded_file):
     else:
         # If no file was uploaded, return an empty DataFrame
         return pd.DataFrame()
-        
-# Function to extract ATC level codes for Human Medicine
+    
+# Adjusted ATC code extraction functions
 def extract_atc_levels_human(atc_code):
-    return (atc_code[:1], atc_code[:3], atc_code[:4], atc_code[:5])
+    # Ensure atc_code is a string to prevent TypeError
+    atc_code = str(atc_code) if pd.notna(atc_code) else ""
+    return pd.Series([atc_code[:1], atc_code[:3], atc_code[:4], atc_code[:5]])
 
-# Function to extract ATC level codes for Veterinary Medicine
 def extract_atc_levels_veterinary(atc_code):
-    return (atc_code[:2], atc_code[:4], atc_code[:5], atc_code[:6])
-
+    atc_code = str(atc_code) if pd.notna(atc_code) else ""
+    return pd.Series([atc_code[:1], atc_code[:3], atc_code[:4], atc_code[:5]])
+        
 # Function to convert DataFrame to CSV
 def convert_df_to_csv(df):
     if df is not None:
@@ -203,6 +205,71 @@ def load_data_sales(uploaded_file):
     else:
         # If no file is uploaded, return an empty DataFrame
         return pd.DataFrame()
+    
+# Function to load a CSV file into a DataFrame with caching
+@st.cache_data
+def load_file(file):
+    return pd.read_csv(file)
+
+# Function to initialize necessary columns in the DataFrame if they don't exist
+def init_columns(df):
+    for column in ['Best Match Name', 'Match Score', 'ATCCode']:
+        if column not in df.columns:
+            df[column] = pd.NA
+    return df
+
+def process_data(mcaz_register, atc_index, extract_atc_levels):
+    if 'start_time' not in st.session_state:
+        with st.spinner('Processing and mapping data...'):
+            st.session_state.start_time = datetime.now(harare_timezone)
+            st.write(f"Processing started at: {st.session_state.start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        # Make sure to set end_time as soon as processing is done
+        st.session_state['end_time'] = datetime.now(harare_timezone)
+        
+    # Ensure 'Name' in ATC index is string
+    atc_index['Name'] = atc_index['Name'].astype(str)
+
+    name_to_atc_code = dict(zip(atc_index['Name'], atc_index['ATCCode']))
+    total_rows = len(mcaz_register)
+    processed_rows = st.session_state.get('processed_rows', 0)
+
+    total_rows = len(mcaz_register)
+    processed_rows = st.session_state.get('processed_rows', 0)
+
+    # Initialize progress bar and display processing message
+    progress_bar = st.progress(0)
+    st.subheader('Processing and mapping data...')
+
+    for index, row in mcaz_register.iloc[processed_rows:].iterrows():
+        # Processing logic (omitted for brevity)
+        if not st.session_state.get('resume_processing', True):
+            break  # Pause processing
+        
+        match_result = process.extractOne(row['Generic Name'], atc_index['Name'], scorer=fuzz.ratio)
+        best_match_name, match_score = match_result[0], match_result[1] if match_result else (None, 0)
+        atc_code = name_to_atc_code.get(best_match_name, None)
+
+        mcaz_register.at[index, 'Best Match Name'] = best_match_name
+        mcaz_register.at[index, 'Match Score'] = match_score
+        mcaz_register.at[index, 'ATCCode'] = atc_code
+
+        progress = int(((index - processed_rows + 1) / (total_rows - processed_rows)) * 100)
+        progress_bar.progress(progress)
+        st.session_state.processed_rows = index + 1
+        
+        # Update progress
+        progress = int(((index - processed_rows + 1) / total_rows) * 100)
+        progress_bar.progress(progress)
+        st.session_state.processed_rows = index + 1
+
+    # Finalize progress and display completion message
+    progress_bar.progress(100)
+    st.session_state.end_time = datetime.now(harare_timezone)
+    processing_time = st.session_state.end_time - st.session_state.start_time
+    st.write(f"Processing completed at: {st.session_state.end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    st.write(f"Total processing time: {processing_time}")
+    st.session_state.fuzzy_matched_data = mcaz_register  # Save processed data for later use
 
 def display_main_application_content():
                         
@@ -299,6 +366,7 @@ def display_main_application_content():
             st.download_button(label="Download Filtered Data as CSV", data=csv, file_name='filtered_data.csv', mime='text/csv')
                                  
             #  Fuzzy matching and ATC Code Extraction
+            # Start of the Streamlit UI layout
             st.subheader("Data Processing with Fuzzy Matching and ATC Code Extraction")
 
             # Choose the type of medicine
@@ -313,63 +381,36 @@ def display_main_application_content():
             mcaz_register_file = st.file_uploader("Upload MCAZ Register File", type=['csv'], key="mcaz_register_uploader")
             atc_index_file = st.file_uploader(f"Upload {'Human' if medicine_type == 'Human Medicine' else 'Veterinary'} ATC Index File", type=['csv'], key="atc_index_uploader")
 
-            # Select the correct ATC code extraction function based on the medicine type
-            extract_atc_levels = extract_atc_levels_human if medicine_type == 'Human Medicine' else extract_atc_levels_veterinary
+            # Initialize or reset session state variables
+            if 'processed_rows' not in st.session_state:
+                st.session_state.processed_rows = 0
+            if 'resume_processing' not in st.session_state:
+                st.session_state.resume_processing = False
 
-            # Initialize atc_index to None outside the conditional blocks
-            atc_index = None
-            mcaz_register = None
-            
-            # Process data only if files are uploaded and fuzzy_matched_data is empty
-            if mcaz_register_file and atc_index_file and st.session_state.get('fuzzy_matched_data', pd.DataFrame()).empty:
-                with st.spinner('Processing and mapping data...'):
-                    start_time = datetime.now(harare_timezone)  # Capture start time
-                    st.write(f"Start Time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")  # Optionally display the start time
+            # Process the uploaded files
+            if mcaz_register_file and atc_index_file:
+                mcaz_register = load_file(mcaz_register_file)
+                atc_index = load_file(atc_index_file)
+                mcaz_register = init_columns(mcaz_register)
 
-                    # Load the two files (consider caching these operations if they're expensive and inputs don't change often)
-                    mcaz_register = pd.read_csv(mcaz_register_file)
-                    atc_index = pd.read_csv(atc_index_file)
+                # Select the correct ATC code extraction function based on the medicine type
+                extract_atc_levels = extract_atc_levels_human if medicine_type == 'Human Medicine' else extract_atc_levels_veterinary
 
-                    # Initialize progress bar
-                    progress_bar = st.progress(0)
-                    total_rows = len(mcaz_register)
-                    batch_size = 100  # Update progress bar every 100 rows, adjust based on your dataset size
-                    name_to_atc_code = dict(zip(atc_index['Name'], atc_index['ATCCode']))
+                if st.button("Start/Resume Processing"):
+                    st.session_state.resume_processing = True
+                    process_data(mcaz_register, atc_index, extract_atc_levels)
+                    
+            # else:
+            #     st.error("Please upload both MCAZ Register and ATC Index files to proceed.")
 
-                    for index, row in mcaz_register.iterrows():
-                        # Perform fuzzy matching for the row
-                        match_result = process.extractOne(row['Generic Name'], atc_index['Name'])
-                        # match_result = process.extractOne(row.Generic_Name, atc_index['Name'])
-                        if match_result:
-                            best_match_name, match_score = match_result[0], match_result[1]
-                        else:
-                            best_match_name, match_score = None, 0
-
-                        atc_code = name_to_atc_code.get(best_match_name, None)
-
-                        # Update the DataFrame row
-                        mcaz_register.at[index, 'Best Match Name'] = best_match_name
-                        mcaz_register.at[index, 'Match Score'] = match_score
-                        mcaz_register.at[index, 'ATCCode'] = atc_code
-
-                        # Update progress bar less frequently
-                        if index % batch_size == 0 or index == total_rows:
-                            progress = (index / total_rows) * 100
-                            progress_bar.progress(int(progress))
-
-                    # Ensure the final progress is set to 100%
-                    progress_bar.progress(100)
-
-                    # Update the session state
-                    st.session_state.fuzzy_matched_data = mcaz_register
-
-                    end_time = datetime.now(harare_timezone)  # Capture end time
-                    st.write(f"End Time: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")  # Optionally display the end time
-
-                    # Calculate and display processing time
-                    processing_time = end_time - start_time
-                    st.write(f"Processing Time: {processing_time}")
-
+            # Reset and clear session state
+            if st.button("Reset Processing"):
+                for key in ['processed_rows', 'resume_processing', 'start_time', 'end_time', 'fuzzy_matched_data', 'atc_level_data']:
+                    if key in st.session_state:
+                        del st.session_state[key]
+                # st.rerun()
+                st.experimental_rerun()
+                
             # Display the processed data only if it exists in session state
             if 'fuzzy_matched_data' in st.session_state and not st.session_state.fuzzy_matched_data.empty:
                 st.write("Updated MCAZ Register with Fuzzy Matching and ATC Codes:")
