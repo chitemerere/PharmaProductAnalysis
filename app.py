@@ -27,14 +27,26 @@ import logging
 harare_timezone = ZoneInfo("Africa/Harare")
 
 # Initialize session state variables at the start
-if 'start_time' not in st.session_state:
-    st.session_state['start_time'] = None
-if 'end_time' not in st.session_state:
-    st.session_state['end_time'] = None
-if 'processed_rows' not in st.session_state:
-    st.session_state['processed_rows'] = 0
-if 'fuzzy_matched_data' not in st.session_state:
-    st.session_state['fuzzy_matched_data'] = pd.DataFrame()
+def initialize_session_state():
+    if 'start_time' not in st.session_state:
+        st.session_state['start_time'] = None
+    if 'end_time' not in st.session_state:
+        st.session_state['end_time'] = None
+    if 'processed_rows' not in st.session_state:
+        st.session_state['processed_rows'] = 0
+    if 'fuzzy_matched_data' not in st.session_state:
+        st.session_state['fuzzy_matched_data'] = pd.DataFrame()
+
+initialize_session_state()
+
+# if 'start_time' not in st.session_state:
+#     st.session_state['start_time'] = None
+# if 'end_time' not in st.session_state:
+#     st.session_state['end_time'] = None
+# if 'processed_rows' not in st.session_state:
+#     st.session_state['processed_rows'] = 0
+# if 'fuzzy_matched_data' not in st.session_state:
+#     st.session_state['fuzzy_matched_data'] = pd.DataFrame()
 
 def safe_load_csv(uploaded_file):
     if uploaded_file is not None and uploaded_file.size > 0:
