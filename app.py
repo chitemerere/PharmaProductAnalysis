@@ -245,7 +245,7 @@ def process_data(mcaz_register, atc_index, extract_atc_levels):
      # Ensure start_time is set at the beginning of processing
     if 'start_time' not in st.session_state or st.session_state.start_time is None:
         st.session_state.start_time = datetime.now(harare_timezone)  # or datetime.now(harare_timezone) if timezone is relevant
-    
+        
     # Ensure 'Name' in ATC index is string
     atc_index['Name'] = atc_index['Name'].astype(str)
 
@@ -260,6 +260,7 @@ def process_data(mcaz_register, atc_index, extract_atc_levels):
     progress_bar = st.progress(0)
     st.subheader('Processing and mapping data...')
     st.session_state.start_time = datetime.now(harare_timezone) 
+    st.write(f"Processing started at: {st.session_state.start_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
     for index, row in mcaz_register.iloc[processed_rows:].iterrows():
         # Processing logic (omitted for brevity)
@@ -466,40 +467,79 @@ def display_main_application_content():
                 print("No data available to convert to CSV")
                 
             if mcaz_register is not None:
-                # Dynamically adjust expected columns based on 'ATCCode' presence
-                expected_columns = ['Generic Name', 'Strength', 'Form', 'Categories for Distribution', 'Manufacturers', 'Principal Name']
-                if 'ATCCode' in mcaz_register.columns:
-                    expected_columns.append('ATCCode')
-                
-                missing_columns = [col for col in expected_columns if col not in mcaz_register.columns]
+            # Proceed only if mcaz_register is a DataFrame
+                try:
+                    mcaz_register = mcaz_register[['Generic Name', 'Strength', 'Form','Categories for Distribution','Manufacturers','Principal Name','Best Match Name', 'Match Score', 'ATCCode']]
+                    # Rest of your code that works with mcaz_register
+                    mcaz_register = mcaz_register.applymap(lambda x: x.upper() if isinstance(x, str) else x)
+                    # You can also save result_df to a CSV file or use it for further processing
+                    
+                    extract_atc_levels = extract_atc_levels_human if medicine_type == 'Human Medicine' else extract_atc_levels_veterinary
 
-                if missing_columns:
-                    st.error(f"Missing columns in uploaded file: {', '.join(missing_columns)}")
-                else:
-                    # Proceed with processing
-                    mcaz_register = mcaz_register[expected_columns]
-                    
-                    # Convert columns to uppercase if they are strings
-                    for col in mcaz_register.columns:
-                        mcaz_register[col] = mcaz_register[col].apply(lambda x: x.upper() if isinstance(x, str) else x)
-                    
-                    # Extract ATC levels if 'ATCCode' column exists
-                    if 'ATCCode' in mcaz_register.columns:
-                        mcaz_register[['ATCLevelOneCode', 'ATCLevelTwoCode', 'ATCLevelThreeCode', 'ATCLevelFourCode']] = mcaz_register['ATCCode'].apply(
-                            lambda x: pd.Series(extract_atc_levels(x))
-                        )
+                    # Apply the function to each ATC code in the DataFrame
+                    mcaz_register[['ATCLevelOneCode', 'ATCLevelTwoCode', 'ATCLevelThreeCode', 'ATCLevelFourCode']] = \
+                        mcaz_register['ATCCode'].apply(lambda x: pd.Series(extract_atc_levels(x)))
 
                     st.session_state.atc_level_data = mcaz_register
 
                     if not st.session_state.atc_level_data.empty:
                         st.write("Updated MCAZ Register with ATC Level Codes:")
                         st.dataframe(st.session_state.atc_level_data)
-                        
-                        # Convert the DataFrame to CSV for download
+
+                        # Download file
                         csv = convert_df_to_csv(st.session_state.atc_level_data)
-                        st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_with_ATC_Level_Codes.csv', mime='text/csv')
+                        st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_with_ATC_Level_Codes.csv', mime='text/csv', key ='download_updated_register')
+                except KeyError as e:
+                    # Handle the case where one or more columns are missing
+                    print(f"Column not found in DataFrame: {e}")
             else:
-                st.error("mcaz_register is None. Please check data loading and processing steps.")
+                # Handle the case where mcaz_register is None
+                print("mcaz_register is None. Please check data loading and processing steps.")
+                
+            # if mcaz_register is not None:
+            #     # Dynamically adjust expected columns based on 'ATCCode' presence
+            #     expected_columns = ['Generic Name', 'Strength', 'Form', 'Categories for Distribution', 'Manufacturers', 'Principal Name']
+            #     if 'ATCCode' in mcaz_register.columns:
+            #         expected_columns.append('ATCCode')
+                
+            #     missing_columns = [col for col in expected_columns if col not in mcaz_register.columns]
+                
+            #     if missing_columns:
+            #         st.error(f"Missing columns in uploaded file: {', '.join(missing_columns)}")
+            #     else:
+            #         # Proceed with processing
+            #         mcaz_register = mcaz_register[expected_columns]
+                    
+            #         # Convert columns to uppercase if they are strings
+            #         for col in mcaz_register.columns:
+            #             mcaz_register[col] = mcaz_register[col].apply(lambda x: x.upper() if isinstance(x, str) else x)
+                    
+            #         # Select the correct ATC code extraction function based on the medicine type
+            #         # extract_atc_levels = extract_atc_levels_human if medicine_type == 'Human Medicine' else extract_atc_levels_veterinary
+                    
+            #         # Extract ATC levels if 'ATCCode' column exists
+            #         if 'ATCCode' in mcaz_register.columns:
+            #             extract_atc_levels = extract_atc_levels_human if medicine_type == 'Human Medicine' else extract_atc_levels_veterinary
+            #             extracted_levels = mcaz_register['ATCCode'].apply(extract_atc_levels)
+            #             for i, level in enumerate(['ATCLevelOneCode', 'ATCLevelTwoCode', 'ATCLevelThreeCode', 'ATCLevelFourCode']):
+            #                 mcaz_register[level] = extracted_levels.apply(lambda x: x[i] if len(x) > i else None)
+
+            #         # if 'ATCCode' in mcaz_register.columns:
+            #         #     mcaz_register[['ATCLevelOneCode', 'ATCLevelTwoCode', 'ATCLevelThreeCode', 'ATCLevelFourCode']] = mcaz_register['ATCCode'].apply(
+            #         #         lambda x: pd.Series(extract_atc_levels(x))
+            #         #     )
+
+            #         st.session_state.atc_level_data = mcaz_register
+
+            #         if not st.session_state.atc_level_data.empty:
+            #             st.write("Updated MCAZ Register with ATC Level Codes:")
+            #             st.dataframe(st.session_state.atc_level_data)
+                        
+            #             # Convert the DataFrame to CSV for download
+            #             csv = convert_df_to_csv(st.session_state.atc_level_data)
+            #             st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_with_ATC_Level_Codes.csv', mime='text/csv')
+            # else:
+            #     st.error("mcaz_register is None. Please check data loading and processing steps.")
 
             # Streamlit UI layout for ATC Code Description Integration and Filtering
             st.subheader("ATC Code Description Integration and Filtering")
