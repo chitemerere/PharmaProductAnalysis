@@ -862,8 +862,8 @@ def display_main_application_content():
 
             # Convert 'Date Registered' to datetime
             filtered_data['Date Registered'] = pd.to_datetime(filtered_data['Date Registered'])
-
-            # Yearly trend analysis
+            
+           # Yearly trend analysis
             yearly_trend = filtered_data['Date Registered'].dt.year.value_counts().sort_index()
             st.line_chart(yearly_trend)
 
