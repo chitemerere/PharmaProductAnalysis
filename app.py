@@ -5,9 +5,6 @@
 
 
 import streamlit as st
-import mysql.connector
-from mysql.connector import Error
-import hashlib
 import datetime
 from zoneinfo import ZoneInfo
 import pandas as pd
@@ -16,12 +13,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from fuzzywuzzy import process
 from fuzzywuzzy import fuzz
-# from datetime import date
 from datetime import datetime 
 import os
 import toml
-import mysql
-import logging
 
 # Specify the timezone for Harare
 harare_timezone = ZoneInfo("Africa/Harare")
@@ -496,63 +490,52 @@ def display_main_application_content():
                 # Handle the case where mcaz_register is None
                 print("mcaz_register is None. Please check data loading and processing steps.")
                 
-            # if mcaz_register is not None:
-            #     # Dynamically adjust expected columns based on 'ATCCode' presence
-            #     expected_columns = ['Generic Name', 'Strength', 'Form', 'Categories for Distribution', 'Manufacturers', 'Principal Name']
-            #     if 'ATCCode' in mcaz_register.columns:
-            #         expected_columns.append('ATCCode')
-                
-            #     missing_columns = [col for col in expected_columns if col not in mcaz_register.columns]
-                
-            #     if missing_columns:
-            #         st.error(f"Missing columns in uploaded file: {', '.join(missing_columns)}")
-            #     else:
-            #         # Proceed with processing
-            #         mcaz_register = mcaz_register[expected_columns]
-                    
-            #         # Convert columns to uppercase if they are strings
-            #         for col in mcaz_register.columns:
-            #             mcaz_register[col] = mcaz_register[col].apply(lambda x: x.upper() if isinstance(x, str) else x)
-                    
-            #         # Select the correct ATC code extraction function based on the medicine type
-            #         # extract_atc_levels = extract_atc_levels_human if medicine_type == 'Human Medicine' else extract_atc_levels_veterinary
-                    
-            #         # Extract ATC levels if 'ATCCode' column exists
-            #         if 'ATCCode' in mcaz_register.columns:
-            #             extract_atc_levels = extract_atc_levels_human if medicine_type == 'Human Medicine' else extract_atc_levels_veterinary
-            #             extracted_levels = mcaz_register['ATCCode'].apply(extract_atc_levels)
-            #             for i, level in enumerate(['ATCLevelOneCode', 'ATCLevelTwoCode', 'ATCLevelThreeCode', 'ATCLevelFourCode']):
-            #                 mcaz_register[level] = extracted_levels.apply(lambda x: x[i] if len(x) > i else None)
-
-            #         # if 'ATCCode' in mcaz_register.columns:
-            #         #     mcaz_register[['ATCLevelOneCode', 'ATCLevelTwoCode', 'ATCLevelThreeCode', 'ATCLevelFourCode']] = mcaz_register['ATCCode'].apply(
-            #         #         lambda x: pd.Series(extract_atc_levels(x))
-            #         #     )
-
-            #         st.session_state.atc_level_data = mcaz_register
-
-            #         if not st.session_state.atc_level_data.empty:
-            #             st.write("Updated MCAZ Register with ATC Level Codes:")
-            #             st.dataframe(st.session_state.atc_level_data)
-                        
-            #             # Convert the DataFrame to CSV for download
-            #             csv = convert_df_to_csv(st.session_state.atc_level_data)
-            #             st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_with_ATC_Level_Codes.csv', mime='text/csv')
-            # else:
-            #     st.error("mcaz_register is None. Please check data loading and processing steps.")
-
             # Streamlit UI layout for ATC Code Description Integration and Filtering
             st.subheader("ATC Code Description Integration and Filtering")
 
             # Initialize variables for ATC data and filter variables
             atc_one = atc_two = atc_three = atc_four = None
             atc_one_desc = atc_two_desc = atc_three_desc = atc_four_desc = selected_generic_names = []
+            
+            # Required columns for each ATC level
+            required_columns_atc_one = ['ATCLevelOneCode', 'ATCLevelOneDescript']
+            required_columns_atc_two = ['ATCLevelTwoCode', 'ATCLevelTwoDescript']
+            required_columns_atc_three = ['ATCLevelThreeCode', 'ATCLevelThreeDescript']
+            required_columns_atc_four = ['ATCLevelFourCode', 'Chemical Subgroup']
 
             # File uploaders for ATC level description files
             atc_one_file = st.file_uploader("Upload ATC Level One Description File", type=['csv'], key="atc_one_uploader")
             atc_two_file = st.file_uploader("Upload ATC Level Two Description File", type=['csv'], key="atc_two_uploader")
             atc_three_file = st.file_uploader("Upload ATC Level Three Description File", type=['csv'], key="atc_three_uploader")
             atc_four_file = st.file_uploader("Upload ATC Level Four Description File", type=['csv'], key="atc_four_uploader")
+            
+            # Button to trigger the check operation
+            check_data = st.button("Check Required Columns")
+
+            def check_required_columns(dataframe, required_columns, atc_level):
+                if dataframe is not None:
+                    missing_columns = [column for column in required_columns if column not in dataframe.columns]
+                    if not missing_columns:
+                        st.success(f"All required columns for ATC Level {atc_level} are present.")
+                    else:
+                        st.error(f"Missing required columns for ATC Level {atc_level}: {', '.join(missing_columns)}")
+                else:
+                    st.warning(f"No file uploaded for ATC Level {atc_level}.")
+
+            if check_data:
+                # Load ATC description files if uploaded
+                atc_one = safe_load_csv(atc_one_file) if atc_one_file else None
+                atc_two = safe_load_csv(atc_two_file) if atc_two_file else None
+                atc_three = safe_load_csv(atc_three_file) if atc_three_file else None
+                atc_four = safe_load_csv(atc_four_file) if atc_four_file else None
+
+                # Check for required columns in each ATC level description file
+                check_required_columns(atc_one, required_columns_atc_one, "One")
+                check_required_columns(atc_two, required_columns_atc_two, "Two")
+                check_required_columns(atc_three, required_columns_atc_three, "Three")
+                check_required_columns(atc_four, required_columns_atc_four, "Four")
+            else:
+                st.info("Please upload ATC level description files and press 'Check Required Columns'.")
 
             # Button to trigger the merge operation
             merge_data = st.button("Merge Data")
@@ -603,10 +586,12 @@ def display_main_application_content():
                 # Handle the case where 'csv' is None, e.g., display a message or take alternative action
                 print("No data available to convert to CSV")
 
-                    
             # Filters
             filter_options = ["None", "ATCLevelOneDescript", "ATCLevelTwoDescript", "ATCLevelThreeDescript", "Chemical Subgroup", "Generic Name"]
             selected_filter = st.radio("Select a filter", filter_options)
+
+            # Initialize an empty DataFrame for filtered_data to handle its scope outside the if condition
+            filtered_data = pd.DataFrame()
 
             if selected_filter != "None" and not st.session_state.get('mcaz_with_ATCCodeDescription', pd.DataFrame()).empty:
                 # Convert all values to string and sort
@@ -623,39 +608,44 @@ def display_main_application_content():
                 else:
                     st.write("No filter applied.")
 
-                    # Download file option
-                    csv = convert_df_to_csv(filtered_data)
-                    st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_filtered.csv', mime='text/csv', key='download_mcaz_register_filtered')
-
-            # Filter data based on local manufacturer or importer for selected type
+            # Check if there is filtered data to download
+            if not filtered_data.empty:
+                csv = convert_df_to_csv(filtered_data)
+                st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_filtered.csv', mime='text/csv', key='download_mcaz_register_filtered')
+            else:
+                # This else block could be optional based on whether you want to display a message when there's no data to download
+                st.write("No data available to download.")
+       
+            # Streamlit UI layout for Data Filtering Based on User Type and Selected Filter
             st.subheader("Data Filtering Based on User Type and Selected Filter")
 
             # Medicine type selection
             medicine_type_options = ["Select Medicine Type", "Human Medicine", "Veterinary Medicine"]
             selected_medicine_type = st.selectbox("Select Medicine Type", medicine_type_options)
 
-            # Only proceed with user type filtering if "Human Medicine" is selected
+            # Initialize an empty DataFrame for mcaz_register to handle its scope outside the if condition
+            mcaz_register = pd.DataFrame()
+
+            # Only proceed with user type filtering if "Human Medicine" is selected and data has been merged
             if selected_medicine_type == "Human Medicine":
-                st.subheader("Data Filtering Based on User Type and Selected Filter")
-
-                # Upload file
-                prohibited_file = st.file_uploader("Upload Prohibited Generics List With Dosage Forms", type=['csv'])
-
                 # User type selection and prohibited generics list upload
                 # Include 'None' in user_type selection
                 user_type_options = ["None", "Local Manufacturer", "Importer"]
                 user_type = st.radio("Select User Type", user_type_options)
 
+                # Upload file for prohibited generics list
+                prohibited_file = st.file_uploader("Upload Prohibited Generics List With Dosage Forms", type=['csv'])
+
                 # Define additional filter options
                 filter_options = ["None", "ATCLevelOneDescript", "ATCLevelTwoDescript", 
-                                    "ATCLevelThreeDescript", "Chemical Subgroup", "Generic Name"]
+                                  "ATCLevelThreeDescript", "Chemical Subgroup", "Generic Name"]
                 selected_filter = st.radio("Select an additional filter", filter_options)
 
                 # Check if the data is available in the session state
                 if 'mcaz_with_ATCCodeDescription' in st.session_state and not st.session_state['mcaz_with_ATCCodeDescription'].empty:
                     mcaz_register = st.session_state['mcaz_with_ATCCodeDescription']
 
-                    # Apply user type filter
+                    # Apply user type filter if a prohibited file is uploaded and a user type is selected
                     if prohibited_file and user_type != "None":
                         prohibited_generics = load_and_process_prohibited_generics(prohibited_file)
                         mcaz_register = filter_data_for_user(user_type, mcaz_register, prohibited_generics)
@@ -666,28 +656,25 @@ def display_main_application_content():
                     # Apply additional filter if selection is not 'None'
                     if selected_filter != "None":
                         filter_values = sorted(mcaz_register[selected_filter].astype(str).unique())
-                        selected_values = st.multiselect(f"Select {selected_filter}", filter_values, key = "valid")
+                        selected_values = st.multiselect(f"Select {selected_filter}", filter_values, key="valid")
 
                         if selected_values:
                             mcaz_register = mcaz_register[mcaz_register[selected_filter].astype(str).isin(selected_values)]
 
+                    # Display filtered data
                     st.write(f"Filtered data count: {len(mcaz_register)}")    
                     st.write("Filtered Data:")
                     st.dataframe(mcaz_register)
+
+                    # Convert filtered data to CSV for download
+                    csv = convert_df_to_csv(mcaz_register)
+                    if csv is not None:
+                        st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_prohibited_medicine.csv', mime='text/csv', key='download_mcaz_filtered')
                 else:
-                    st.write("Data not available in the session state.")
+                    st.write("Data not available in the session state or no data to display after filtering.")
             else:
                 st.write("Select 'Human Medicine' to access user type based data filtering.")
-                
-            # Download file
-            csv = convert_df_to_csv(mcaz_register)
-            if csv is not None:
-                # Proceed with operations that use 'csv'
-                st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_prohibited_medicine.csv', mime='text/csv', key='download_mcaz_filtered')
 
-            else:
-                # Handle the case where 'csv' is None, e.g., display a message or take alternative action
-                print("No data available to convert to CSV")
         
         # Market Analysis
         elif choice == 'Market Analysis':
@@ -1505,16 +1492,5 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
 
 
