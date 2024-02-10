@@ -289,6 +289,16 @@ def process_data(mcaz_register, atc_index, extract_atc_levels):
     else:
         st.error("Processing time could not be calculated due to missing start or end time.")
     st.session_state.fuzzy_matched_data = mcaz_register  # Save processed data for later use
+    
+def check_required_columns(dataframe, required_columns, atc_level):
+    if dataframe is not None:
+        missing_columns = [column for column in required_columns if column not in dataframe.columns]
+        if not missing_columns:
+            st.success(f"All required columns for ATC Level {atc_level} are present.")
+        else:
+            st.error(f"Missing required columns for ATC Level {atc_level}: {', '.join(missing_columns)}")
+    else:
+        st.warning(f"No file uploaded for ATC Level {atc_level}.")
 
 def display_main_application_content():
                         
@@ -512,15 +522,15 @@ def display_main_application_content():
             # Button to trigger the check operation
             check_data = st.button("Check Required Columns")
 
-            def check_required_columns(dataframe, required_columns, atc_level):
-                if dataframe is not None:
-                    missing_columns = [column for column in required_columns if column not in dataframe.columns]
-                    if not missing_columns:
-                        st.success(f"All required columns for ATC Level {atc_level} are present.")
-                    else:
-                        st.error(f"Missing required columns for ATC Level {atc_level}: {', '.join(missing_columns)}")
-                else:
-                    st.warning(f"No file uploaded for ATC Level {atc_level}.")
+#             def check_required_columns(dataframe, required_columns, atc_level):
+#                 if dataframe is not None:
+#                     missing_columns = [column for column in required_columns if column not in dataframe.columns]
+#                     if not missing_columns:
+#                         st.success(f"All required columns for ATC Level {atc_level} are present.")
+#                     else:
+#                         st.error(f"Missing required columns for ATC Level {atc_level}: {', '.join(missing_columns)}")
+#                 else:
+#                     st.warning(f"No file uploaded for ATC Level {atc_level}.")
 
             if check_data:
                 # Load ATC description files if uploaded
