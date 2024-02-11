@@ -33,15 +33,6 @@ def initialize_session_state():
 
 initialize_session_state()
 
-# if 'start_time' not in st.session_state:
-#     st.session_state['start_time'] = None
-# if 'end_time' not in st.session_state:
-#     st.session_state['end_time'] = None
-# if 'processed_rows' not in st.session_state:
-#     st.session_state['processed_rows'] = 0
-# if 'fuzzy_matched_data' not in st.session_state:
-#     st.session_state['fuzzy_matched_data'] = pd.DataFrame()
-
 def safe_load_csv(uploaded_file):
     if uploaded_file is not None and uploaded_file.size > 0:
         return pd.read_csv(uploaded_file)
@@ -493,18 +484,20 @@ def display_main_application_content():
                 print("No data available to convert to CSV")
                 
             if mcaz_register is not None:
-            # Proceed only if mcaz_register is a DataFrame
                 try:
-                    mcaz_register = mcaz_register[['Generic Name', 'Strength', 'Form','Categories for Distribution','Manufacturers','Principal Name','Best Match Name', 'Match Score', 'ATCCode']]
-                    # Rest of your code that works with mcaz_register
-                    mcaz_register = mcaz_register.applymap(lambda x: x.upper() if isinstance(x, str) else x)
-                    # You can also save result_df to a CSV file or use it for further processing
-                    
+                    mcaz_register = mcaz_register[['Generic Name', 'Strength', 'Form', 'Categories for Distribution', 'Manufacturers', 'Principal Name', 'Best Match Name', 'Match Score', 'ATCCode']]
+
+                    # Convert all strings in the DataFrame to uppercase
+                    for column in mcaz_register.columns:
+                        mcaz_register[column] = mcaz_register[column].map(lambda x: x.upper() if isinstance(x, str) else x)
+
+                    # Assuming extract_atc_levels_human and extract_atc_levels_veterinary are defined
                     extract_atc_levels = extract_atc_levels_human if medicine_type == 'Human Medicine' else extract_atc_levels_veterinary
 
                     # Apply the function to each ATC code in the DataFrame
-                    mcaz_register[['ATCLevelOneCode', 'ATCLevelTwoCode', 'ATCLevelThreeCode', 'ATCLevelFourCode']] = \
-                        mcaz_register['ATCCode'].apply(lambda x: pd.Series(extract_atc_levels(x)))
+                    atc_data = mcaz_register['ATCCode'].apply(lambda x: pd.Series(extract_atc_levels(x)))
+                    atc_data.columns = ['ATCLevelOneCode', 'ATCLevelTwoCode', 'ATCLevelThreeCode', 'ATCLevelFourCode']
+                    mcaz_register = pd.concat([mcaz_register, atc_data], axis=1)
 
                     st.session_state.atc_level_data = mcaz_register
 
@@ -514,14 +507,12 @@ def display_main_application_content():
 
                         # Download file
                         csv = convert_df_to_csv(st.session_state.atc_level_data)
-                        st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_with_ATC_Level_Codes.csv', mime='text/csv', key ='download_updated_register')
+                        st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_with_ATC_Level_Codes.csv', mime='text/csv', key='download_updated_register')
                 except KeyError as e:
-                    # Handle the case where one or more columns are missing
                     print(f"Column not found in DataFrame: {e}")
             else:
-                # Handle the case where mcaz_register is None
                 print("mcaz_register is None. Please check data loading and processing steps.")
-                
+
             # Streamlit UI layout for ATC Code Description Integration and Filtering
             st.subheader("ATC Code Description Integration and Filtering")
 
