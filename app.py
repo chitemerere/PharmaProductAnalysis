@@ -643,8 +643,9 @@ def display_main_application_content():
             if selected_medicine_type == "Human Medicine":
                 user_type_options = ["None", "Local Manufacturer", "Importer"]
                 user_type = st.radio("Select User Type", user_type_options)
-
-                prohibited_file = st.file_uploader("Upload Prohibited Generics List With Dosage Forms", type=['csv'])
+                
+                # File uploader widget
+                prohibited_file = st.file_uploader("Upload Prohibited Generics List With Strength & Dosage Form", type=['csv'])
 
                 if prohibited_file is not None:
                     # Attempt to read the uploaded file for column verification
@@ -652,10 +653,18 @@ def display_main_application_content():
                         temp_df = pd.read_csv(prohibited_file)
                         # Reset the file pointer after reading
                         prohibited_file.seek(0)
-                        required_columns = ['Generic Name', 'Form']
+                        required_columns = ['Generic Name', 'Strength', 'Form']
                         check_passed, missing_columns = check_prohibited_file_columns(temp_df, required_columns)
                         if check_passed:
                             st.success("Uploaded file contains all required columns.")
+
+                            # Create the 'Combined' column
+                            temp_df['Combined'] = temp_df['Generic Name'] + " - " + temp_df['Strength'].astype(str) + " - " + temp_df['Form']
+
+                            # Here you can choose to display the DataFrame or process it further
+                            # For example, to display the first few rows of the DataFrame with the new 'Combined' column
+#                             st.dataframe(temp_df)
+
                         else:
                             st.error(f"Uploaded file is missing required columns: {', '.join(missing_columns)}")
                             # Skip further processing if required columns are missing
