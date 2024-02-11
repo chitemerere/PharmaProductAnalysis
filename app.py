@@ -299,6 +299,28 @@ def check_required_columns(dataframe, required_columns, atc_level):
             st.error(f"Missing required columns for ATC Level {atc_level}: {', '.join(missing_columns)}")
     else:
         st.warning(f"No file uploaded for ATC Level {atc_level}.")
+        
+# Function to check for required columns in the uploaded file
+def check_required_columns_in_file(file, required_columns):
+    if file is not None:
+        # Attempt to read the uploaded file into a DataFrame
+        try:
+            df = pd.read_csv(file)
+            missing_columns = [column for column in required_columns if column not in df.columns]
+            if missing_columns:
+                return False, missing_columns
+            return True, None
+        except Exception as e:
+            st.error(f"Failed to read the uploaded file. Error: {str(e)}")
+            return False, None
+    return None, None  # Indicates no file was uploaded
+
+def check_prohibited_file_columns(df, required_columns):
+    # Check for the presence of required columns in the dataframe
+    missing_columns = [column for column in required_columns if column not in df.columns]
+    if missing_columns:
+        return False, missing_columns
+    return True, []
 
 def display_main_application_content():
                         
@@ -522,16 +544,6 @@ def display_main_application_content():
             # Button to trigger the check operation
             check_data = st.button("Check Required Columns")
 
-#             def check_required_columns(dataframe, required_columns, atc_level):
-#                 if dataframe is not None:
-#                     missing_columns = [column for column in required_columns if column not in dataframe.columns]
-#                     if not missing_columns:
-#                         st.success(f"All required columns for ATC Level {atc_level} are present.")
-#                     else:
-#                         st.error(f"Missing required columns for ATC Level {atc_level}: {', '.join(missing_columns)}")
-#                 else:
-#                     st.warning(f"No file uploaded for ATC Level {atc_level}.")
-
             if check_data:
                 # Load ATC description files if uploaded
                 atc_one = safe_load_csv(atc_one_file) if atc_one_file else None
@@ -625,7 +637,7 @@ def display_main_application_content():
             else:
                 # This else block could be optional based on whether you want to display a message when there's no data to download
                 st.write("No data available to download.")
-       
+               
             # Streamlit UI layout for Data Filtering Based on User Type and Selected Filter
             st.subheader("Data Filtering Based on User Type and Selected Filter")
 
@@ -638,32 +650,41 @@ def display_main_application_content():
 
             # Only proceed with user type filtering if "Human Medicine" is selected and data has been merged
             if selected_medicine_type == "Human Medicine":
-                # User type selection and prohibited generics list upload
-                # Include 'None' in user_type selection
                 user_type_options = ["None", "Local Manufacturer", "Importer"]
                 user_type = st.radio("Select User Type", user_type_options)
 
-                # Upload file for prohibited generics list
                 prohibited_file = st.file_uploader("Upload Prohibited Generics List With Dosage Forms", type=['csv'])
 
-                # Define additional filter options
+                if prohibited_file is not None:
+                    # Attempt to read the uploaded file for column verification
+                    try:
+                        temp_df = pd.read_csv(prohibited_file)
+                        # Reset the file pointer after reading
+                        prohibited_file.seek(0)
+                        required_columns = ['Generic Name', 'Form']
+                        check_passed, missing_columns = check_prohibited_file_columns(temp_df, required_columns)
+                        if check_passed:
+                            st.success("Uploaded file contains all required columns.")
+                        else:
+                            st.error(f"Uploaded file is missing required columns: {', '.join(missing_columns)}")
+                            # Skip further processing if required columns are missing
+                            prohibited_file = None
+                    except Exception as e:
+                        st.error(f"An error occurred while processing the file: {str(e)}")
+                        prohibited_file = None
+
                 filter_options = ["None", "ATCLevelOneDescript", "ATCLevelTwoDescript", 
                                   "ATCLevelThreeDescript", "Chemical Subgroup", "Generic Name"]
                 selected_filter = st.radio("Select an additional filter", filter_options)
 
-                # Check if the data is available in the session state
                 if 'mcaz_with_ATCCodeDescription' in st.session_state and not st.session_state['mcaz_with_ATCCodeDescription'].empty:
                     mcaz_register = st.session_state['mcaz_with_ATCCodeDescription']
 
-                    # Apply user type filter if a prohibited file is uploaded and a user type is selected
                     if prohibited_file and user_type != "None":
                         prohibited_generics = load_and_process_prohibited_generics(prohibited_file)
                         mcaz_register = filter_data_for_user(user_type, mcaz_register, prohibited_generics)
-
-                        # Option 1: Remove complete duplicates
                         mcaz_register = mcaz_register.drop_duplicates()
 
-                    # Apply additional filter if selection is not 'None'
                     if selected_filter != "None":
                         filter_values = sorted(mcaz_register[selected_filter].astype(str).unique())
                         selected_values = st.multiselect(f"Select {selected_filter}", filter_values, key="valid")
@@ -671,21 +692,18 @@ def display_main_application_content():
                         if selected_values:
                             mcaz_register = mcaz_register[mcaz_register[selected_filter].astype(str).isin(selected_values)]
 
-                    # Display filtered data
                     st.write(f"Filtered data count: {len(mcaz_register)}")    
                     st.write("Filtered Data:")
                     st.dataframe(mcaz_register)
 
-                    # Convert filtered data to CSV for download
                     csv = convert_df_to_csv(mcaz_register)
                     if csv is not None:
                         st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_prohibited_medicine.csv', mime='text/csv', key='download_mcaz_filtered')
                 else:
-                    st.write("Data not available in the session state or no data to display after filtering.")
+                    st.error("Data not available in the session state or no data to display after filtering.")
             else:
-                st.write("Select 'Human Medicine' to access user type based data filtering.")
-
-        
+                st.error("Select 'Human Medicine' to access user type based data filtering.")
+       
         # Market Analysis
         elif choice == 'Market Analysis':
             st.subheader('Market Analysis')
@@ -812,32 +830,55 @@ def display_main_application_content():
             
             # Streamlit widget to upload the Prohibited Medicines file
             uploaded_prohibited_file = st.file_uploader("Upload Prohibited Medicines file With Strength and Dosage Form", type=['csv'])
+            
+            # Required columns
+            required_columns = ['Generic Name', 'Strength', 'Form']
+
+            # Check for required columns if a file is uploaded
+            file_check_passed, missing_columns = check_required_columns_in_file(uploaded_prohibited_file, required_columns)
+
+            if file_check_passed is True:
+                st.success("Uploaded file contains all required columns.")
+            elif file_check_passed is False:
+                st.error(f"Uploaded file is missing required columns: {', '.join(missing_columns)}")
+            elif file_check_passed is None and uploaded_prohibited_file is not None:
+                st.warning("Please upload a file to proceed.")
 
             # Assuming you have a variable to capture the user type
             user_type = st.selectbox('Select User Type', ['None', 'Importer', 'Local Manufacturer'])
-
+            
             if uploaded_prohibited_file is not None:
-                # Load the Prohibited Medicines file
-                prohibited_medicines_df = pd.read_csv(uploaded_prohibited_file)
+                uploaded_prohibited_file.seek(0)  # Reset file pointer to the start
+                try:
+                    # Attempt to load the Prohibited Medicines file
+                    prohibited_medicines_df = pd.read_csv(uploaded_prohibited_file)
+
+                    # Ensure the DataFrame is not empty by checking if it has columns
+                    if prohibited_medicines_df.empty:
+                        st.error("Uploaded file is empty or does not contain any data.")
+                    else:
+                        # Convert column names to uppercase to match the MCAZ Register
+                        prohibited_medicines_df.columns = prohibited_medicines_df.columns.str.upper()
                 
-                # Convert column names to uppercase to match the MCAZ Register
-                prohibited_medicines_df.columns = prohibited_medicines_df.columns.str.upper()
-                
-                # Combine 'GENERIC NAME', 'STRENGTH', and 'FORM' to match the 'Combined' format in your data dataframe
-                prohibited_medicines_df['COMBINED'] = prohibited_medicines_df['GENERIC NAME'] + " - " + prohibited_medicines_df['STRENGTH'].astype(str) + " - " + prohibited_medicines_df['FORM']
-                
-                # Example to integrate the prohibited medicines filter based on the user type
-                if user_type == 'Importer':
-                    # Assuming 'filtered_counts' is already defined in your code with the counts of unique products
-                    # First, ensure 'filtered_counts' is in a format that can be filtered (e.g., a DataFrame)
+                        # Combine 'GENERIC NAME', 'STRENGTH', and 'FORM' to match the 'Combined' format in your data dataframe
+                        prohibited_medicines_df['COMBINED'] = prohibited_medicines_df['GENERIC NAME'] + " - " + prohibited_medicines_df['STRENGTH'].astype(str) + " - " + prohibited_medicines_df['FORM']
+
+                        # Example to integrate the prohibited medicines filter based on the user type
+                        if user_type == 'Importer':
+                            # Assuming 'filtered_counts' is already defined in your code with the counts of unique products
+                            # First, ensure 'filtered_counts' is in a format that can be filtered (e.g., a DataFrame)
+
+                            # Exclude prohibited medicines for importers
+                            prohibited_list = prohibited_medicines_df['COMBINED'].tolist()
+                            filtered_counts = filtered_counts[~filtered_counts.index.isin(prohibited_list)]
+
+                            # Display the filtered 'filtered_counts' DataFrame
+                            st.write(filtered_counts)
                     
-                    # Exclude prohibited medicines for importers
-                    prohibited_list = prohibited_medicines_df['COMBINED'].tolist()
-                    filtered_counts = filtered_counts[~filtered_counts.index.isin(prohibited_list)]
-                    
-                    # Display the filtered 'filtered_counts' DataFrame
-                    st.write(filtered_counts)
-           
+                except Exception as e:
+                    # This will catch all exceptions, including any related to empty data or parsing issues
+                    st.error(f"An error occurred while processing the file: {str(e)}")
+                   
         # Manufacturer Analysis
         elif choice == 'Manufacturer Analysis':
             st.subheader('Manufacturer Analysis')
