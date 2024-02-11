@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[1]:
 
 
 import streamlit as st
@@ -41,7 +41,6 @@ def safe_load_csv(uploaded_file):
 
 # Function to load data
 @st.cache_data
-
 def load_data(uploaded_file):
     if uploaded_file is not None:
         # Check if the uploaded file is not empty
@@ -158,6 +157,7 @@ def fuzzy_match_names(series, threshold=90):
 
     return series.map(matched_names)
 
+@st.cache_data
 def load_data_fda(uploaded_file):
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
@@ -618,6 +618,7 @@ def display_main_application_content():
                     ]
                     st.write(f"Filtered Data by {selected_filter}:")
                     st.dataframe(filtered_data)
+                    st.write(f"Filtered data count: {len(filtered_data)}")
                 else:
                     st.write("No filter applied.")
 
@@ -1543,5 +1544,11 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+# In[ ]:
+
+
 
 
