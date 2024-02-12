@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[ ]:
 
 
 import streamlit as st
@@ -41,6 +41,7 @@ def safe_load_csv(uploaded_file):
 
 # Function to load data
 @st.cache_data
+
 def load_data(uploaded_file):
     if uploaded_file is not None:
         # Check if the uploaded file is not empty
@@ -157,7 +158,6 @@ def fuzzy_match_names(series, threshold=90):
 
     return series.map(matched_names)
 
-@st.cache_data
 def load_data_fda(uploaded_file):
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
@@ -644,9 +644,8 @@ def display_main_application_content():
             if selected_medicine_type == "Human Medicine":
                 user_type_options = ["None", "Local Manufacturer", "Importer"]
                 user_type = st.radio("Select User Type", user_type_options)
-                
-                # File uploader widget
-                prohibited_file = st.file_uploader("Upload Prohibited Generics List With Strength & Dosage Form", type=['csv'])
+
+                prohibited_file = st.file_uploader("Upload Prohibited Generics List With Dosage Forms", type=['csv'])
 
                 if prohibited_file is not None:
                     # Attempt to read the uploaded file for column verification
@@ -654,18 +653,10 @@ def display_main_application_content():
                         temp_df = pd.read_csv(prohibited_file)
                         # Reset the file pointer after reading
                         prohibited_file.seek(0)
-                        required_columns = ['Generic Name', 'Strength', 'Form']
+                        required_columns = ['Generic Name', 'Form']
                         check_passed, missing_columns = check_prohibited_file_columns(temp_df, required_columns)
                         if check_passed:
                             st.success("Uploaded file contains all required columns.")
-
-                            # Create the 'Combined' column
-                            temp_df['Combined'] = temp_df['Generic Name'] + " - " + temp_df['Strength'].astype(str) + " - " + temp_df['Form']
-
-                            # Here you can choose to display the DataFrame or process it further
-                            # For example, to display the first few rows of the DataFrame with the new 'Combined' column
-#                             st.dataframe(temp_df)
-
                         else:
                             st.error(f"Uploaded file is missing required columns: {', '.join(missing_columns)}")
                             # Skip further processing if required columns are missing
@@ -693,9 +684,9 @@ def display_main_application_content():
                         if selected_values:
                             mcaz_register = mcaz_register[mcaz_register[selected_filter].astype(str).isin(selected_values)]
 
-                    st.write(f"Filtered data count: {len(mcaz_register)}")    
                     st.write("Filtered Data:")
                     st.dataframe(mcaz_register)
+                    st.write(f"Filtered data count: {len(mcaz_register)}")
 
                     csv = convert_df_to_csv(mcaz_register)
                     if csv is not None:
@@ -1544,11 +1535,5 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-# In[ ]:
-
-
 
 
