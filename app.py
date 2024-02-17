@@ -1504,6 +1504,7 @@ def display_main_application_content():
 
 def main():
     # Password input
+    st.image("logo.png", width=200)
     st.markdown("<h1 style='font-size:30px;'>Pharmaceutical Products Analysis Application</h1>", unsafe_allow_html=True)
     password_guess = st.text_input('What is the Password?', type="password").strip()
 
