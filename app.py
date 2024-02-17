@@ -866,6 +866,12 @@ def display_main_application_content():
 
                             # Display the filtered 'filtered_counts' DataFrame
                             st.write(filtered_counts)
+                            
+                            # Download button for unique product count
+                            if not filtered_counts.empty:
+                                csv = filtered_counts.to_csv(index=False)
+                                st.download_button("Download Unique Products Data", csv, "unique_products_importer_data.csv", "text/csv", key='download-unique-product_importer')
+
                     
                 except Exception as e:
                     # This will catch all exceptions, including any related to empty data or parsing issues
