@@ -316,11 +316,11 @@ def check_prohibited_file_columns(df, required_columns):
 # Helper function to process the uploaded file and generate the "COUNTRY" column
 def process_uploaded_file(uploaded_file):
     df = pd.read_csv(uploaded_file, encoding='ISO-8859-1')
-    df['COUNTRY'] = df['ADDRESS'].str.extract(r'\(([^)]+)\)$')
+    df['COUNTRY_CODE'] = df['ADDRESS'].str.extract(r'\(([^)]+)\)$')
     columns = [
         "FIRM_NAME",
         "ADDRESS",
-        "COUNTRY",
+        "COUNTRY_CODE",
         "EXPIRATION_DATE",
         "OPERATIONS",
         "ESTABLISHMENT_CONTACT_NAME",
@@ -332,26 +332,23 @@ def process_uploaded_file(uploaded_file):
     df = df[columns]
     return df
 
-# Function to filter the dataframe based on user selection or show all if "All" is selected
+# Define the filter_dataframe function with the 'Country' filter instead of 'Country Code'
 def filter_dataframe(df, firm_name, country, operations, registrant_name):
     if firm_name != "All":
         df = df[df['FIRM_NAME'] == firm_name]
     if country != "All":
-        df = df[df['COUNTRY'] == country]
-
-    # Adjusted filtering logic for OPERATIONS to match the field exactly
+        df = df[df['Country'] == country]  # Changed to 'Country'
     if operations != "All":
         df = df[df['OPERATIONS'].apply(lambda x: x.strip() == operations)]
-    
+
     if registrant_name != "All":
         df = df[df['REGISTRANT_NAME'] == registrant_name]
     
-    return df.sort_values(by=["FIRM_NAME", "COUNTRY", "OPERATIONS", "REGISTRANT_NAME"], ascending=True)
-
+    # Sort the dataframe
+    return df.sort_values(by=["FIRM_NAME", "Country", "OPERATIONS", "REGISTRANT_NAME"], ascending=True)
 
 def display_main_application_content():
                         
-#     st.markdown("<h1 style='font-size:30px;'>Pharmaceutical Products Analysis Application</h1>", unsafe_allow_html=True)
     # Initialize mcaz_register as an empty DataFrame at the start
     mcaz_register = pd.DataFrame()       
 
@@ -1525,26 +1522,35 @@ def display_main_application_content():
         elif choice == 'FDA Drug Establishment Sites':
             st.subheader('FDA Drug Establishment Sites')
             
-            uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
-            if uploaded_file is not None:
-                df = process_uploaded_file(uploaded_file)
-                
+            # File uploader for the Establishment file
+            establishment_file = st.file_uploader("Choose an Establishment CSV file", type="csv")
+            # File uploader for the Country Codes file
+            country_codes_file = st.file_uploader("Choose a Country Codes CSV file", type="csv")
+
+            if establishment_file is not None and country_codes_file is not None:
+                # Process the uploaded files
+                df = process_uploaded_file(establishment_file)
+                country_codes_df = pd.read_csv(country_codes_file)
+
+                # Merge the establishment dataframe with the country codes dataframe
+                merged_df = df.merge(country_codes_df, left_on='COUNTRY_CODE', right_on='Alpha-3 code', how='left')
+
                 # Ensure all values are strings for sorting and filtering
-                df.fillna('Unknown', inplace=True)
+                merged_df.fillna('Unknown', inplace=True)
 
                 # Dropdowns for filtering with sorted options
-                firm_name_options = sorted(df['FIRM_NAME'].unique().tolist())
-                country_options = sorted(df['COUNTRY'].unique().tolist())
-                operations_options = sorted(df['OPERATIONS'].unique().tolist(), key=lambda x: (x is np.nan, x))
-                registrant_name_options = sorted(df['REGISTRANT_NAME'].unique().tolist())
+                firm_name_options = sorted(merged_df['FIRM_NAME'].unique().tolist())
+                country_options = sorted(merged_df['Country'].unique().tolist())  # Changed to 'Country'
+                operations_options = sorted(merged_df['OPERATIONS'].unique().tolist(), key=lambda x: (x is np.nan, x))
+                registrant_name_options = sorted(merged_df['REGISTRANT_NAME'].unique().tolist())
 
                 firm_name = st.selectbox("Firm Name", ["All"] + firm_name_options)
-                country = st.selectbox("Country", ["All"] + country_options)
+                country = st.selectbox("Country", ["All"] + country_options)  # Changed to 'Country'
                 operations = st.selectbox("Operations", ["All"] + operations_options)
                 registrant_name = st.selectbox("Registrant Name", ["All"] + registrant_name_options)
 
                 # Filter the dataframe based on selection
-                filtered_df = filter_dataframe(df, firm_name, country, operations, registrant_name)
+                filtered_df = filter_dataframe(merged_df, firm_name, country, operations, registrant_name)
 
                 # Save the filtered dataframe in the session state for persistence across modules
                 st.session_state.filtered_data = filtered_df
