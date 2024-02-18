@@ -313,6 +313,42 @@ def check_prohibited_file_columns(df, required_columns):
         return False, missing_columns
     return True, []
 
+# Helper function to process the uploaded file and generate the "COUNTRY" column
+def process_uploaded_file(uploaded_file):
+    df = pd.read_csv(uploaded_file, encoding='ISO-8859-1')
+    df['COUNTRY'] = df['ADDRESS'].str.extract(r'\(([^)]+)\)$')
+    columns = [
+        "FIRM_NAME",
+        "ADDRESS",
+        "COUNTRY",
+        "EXPIRATION_DATE",
+        "OPERATIONS",
+        "ESTABLISHMENT_CONTACT_NAME",
+        "ESTABLISHMENT_CONTACT_EMAIL",
+        "REGISTRANT_NAME",
+        "REGISTRANT_CONTACT_NAME",
+        "REGISTRANT_CONTACT_EMAIL"
+    ]
+    df = df[columns]
+    return df
+
+# Function to filter the dataframe based on user selection or show all if "All" is selected
+def filter_dataframe(df, firm_name, country, operations, registrant_name):
+    if firm_name != "All":
+        df = df[df['FIRM_NAME'] == firm_name]
+    if country != "All":
+        df = df[df['COUNTRY'] == country]
+
+    # Adjusted filtering logic for OPERATIONS to match the field exactly
+    if operations != "All":
+        df = df[df['OPERATIONS'].apply(lambda x: x.strip() == operations)]
+    
+    if registrant_name != "All":
+        df = df[df['REGISTRANT_NAME'] == registrant_name]
+    
+    return df.sort_values(by=["FIRM_NAME", "COUNTRY", "OPERATIONS", "REGISTRANT_NAME"], ascending=True)
+
+
 def display_main_application_content():
                         
 #     st.markdown("<h1 style='font-size:30px;'>Pharmaceutical Products Analysis Application</h1>", unsafe_allow_html=True)
@@ -323,7 +359,8 @@ def display_main_application_content():
     selected_generic_names = []   
 
     # Sidebar for navigation
-    menu = ['Data Overview', 'Market Analysis', 'Manufacturer Analysis', 'FDA Orange Book Analysis', 'Patient-flow Forecast', 'Drug Classification Analysis', 'Drugs with no Competition', 'Top Pharma Companies Sales']
+    menu = ['Data Overview', 'Market Analysis', 'Manufacturer Analysis', 'FDA Orange Book Analysis', 
+            'Patient-flow Forecast', 'Drug Classification Analysis', 'Drugs with no Competition', 'Top Pharma Companies Sales', 'FDA Drug Establishment Sites']
     choice = st.sidebar.radio("Menu", menu)
     
     # File uploader
@@ -1483,7 +1520,46 @@ def display_main_application_content():
                     )
             else:
                 st.write("Please upload a sales data CSV file to get started.")
-         
+        
+        # FDA Drug Establishment Sites
+        elif choice == 'FDA Drug Establishment Sites':
+            st.subheader('FDA Drug Establishment Sites')
+            
+            uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+            if uploaded_file is not None:
+                df = process_uploaded_file(uploaded_file)
+                
+                # Ensure all values are strings for sorting and filtering
+                df.fillna('Unknown', inplace=True)
+
+                # Dropdowns for filtering with sorted options
+                firm_name_options = sorted(df['FIRM_NAME'].unique().tolist())
+                country_options = sorted(df['COUNTRY'].unique().tolist())
+                operations_options = sorted(df['OPERATIONS'].unique().tolist(), key=lambda x: (x is np.nan, x))
+                registrant_name_options = sorted(df['REGISTRANT_NAME'].unique().tolist())
+
+                firm_name = st.selectbox("Firm Name", ["All"] + firm_name_options)
+                country = st.selectbox("Country", ["All"] + country_options)
+                operations = st.selectbox("Operations", ["All"] + operations_options)
+                registrant_name = st.selectbox("Registrant Name", ["All"] + registrant_name_options)
+
+                # Filter the dataframe based on selection
+                filtered_df = filter_dataframe(df, firm_name, country, operations, registrant_name)
+
+                # Save the filtered dataframe in the session state for persistence across modules
+                st.session_state.filtered_data = filtered_df
+
+                st.dataframe(filtered_df)
+
+                # Download button for the filtered dataframe
+                csv = filtered_df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="Download filtered data as CSV",
+                    data=csv,
+                    file_name='filtered_fda_sites.csv',
+                    mime='text/csv',
+                )
+        
     else:
         st.warning('Please upload MCAZ Register CSV file.')
 
@@ -1504,7 +1580,7 @@ def main():
             # Correctly using datetime.strptime now
             # expiration_date = st.secrets["expiration_date"]
             expiration_date = datetime.strptime(st.secrets["expiration_date"], "%d-%m-%Y")
-#             expiration_date = dt.strptime(st.secrets["expiration_date"], "%d-%m-%Y")
+
         except Exception as e:
             st.error(f"Error parsing expiration date: {e}")
             st.stop()
