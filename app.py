@@ -162,7 +162,7 @@ def load_data_fda(uploaded_file):
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
         return df
-    return pd.DataFrame()
+    return pd.DataFrame() 
 
 def filter_fda_data(fda_data, mcaz_register):
     filtered_data = fda_data.copy()
@@ -1133,20 +1133,25 @@ def display_main_application_content():
 
         # FDA Orange Book Analysis
         elif choice == 'FDA Orange Book Analysis':
-            st.title("FDA Orange Book Analysis")
+            # Check if the dataframes are already loaded in the session state
+            if 'products_df' not in st.session_state or 'patent_df' not in st.session_state or 'exclusivity_df' not in st.session_state:
+                st.title("FDA Orange Book Analysis")
 
-            # File uploaders
-            products_file = st.file_uploader("Upload the products.csv file", type=['csv'], key="products_uploader")
-            patent_file = st.file_uploader("Upload the patent.csv file", type=['csv'], key="patent_uploader")
-            exclusivity_file = st.file_uploader("Upload the exclusivity.csv file", type=['csv'], key="exclusivity_uploader")
+                # File uploaders
+                products_file = st.file_uploader("Upload the products.csv file", type=['csv'], key="products_uploader")
+                patent_file = st.file_uploader("Upload the patent.csv file", type=['csv'], key="patent_uploader")
+                exclusivity_file = st.file_uploader("Upload the exclusivity.csv file", type=['csv'], key="exclusivity_uploader")
 
-            if products_file and patent_file and exclusivity_file:
-                products_df = load_data_orange(products_file)
-                patent_df = load_data_orange(patent_file)
-                exclusivity_df = load_data_orange(exclusivity_file)
+                if products_file and patent_file and exclusivity_file:
+                    # Load the dataframes and store them in the session state
+                    st.session_state.products_df = load_data_orange(products_file)
+                    st.session_state.patent_df = load_data_orange(patent_file)
+                    st.session_state.exclusivity_df = load_data_orange(exclusivity_file)
 
-                # Outer join tables by "Appl_No"
-                merged_df = outer_join_dfs(products_df, patent_df, exclusivity_df, "Appl_No")
+            # If the dataframes are in the session state, proceed with the analysis
+            if 'products_df' in st.session_state and 'patent_df' in st.session_state and 'exclusivity_df' in st.session_state:
+                # Perform the analysis using the dataframes from the session state
+                merged_df = outer_join_dfs(st.session_state.products_df, st.session_state.patent_df, st.session_state.exclusivity_df, "Appl_No")
 
                 # Remove duplicates
                 merged_df = merged_df.drop_duplicates(subset=['Ingredient', 'DF;Route', 'Strength', 'Appl_No', 'Product_No_x', 'Patent_No'])
@@ -1357,154 +1362,128 @@ def display_main_application_content():
 
             # Medicine type selection
             medicine_type = st.radio("Select Medicine Type", ["Human Medicine", "Veterinary Medicine"])
-
-            # Load MCAZ Register data (assuming it's already in session state)
+            
+            # Load MCAZ Register data from session state or initialize if not present
             mcaz_register = st.session_state.get('mcaz_register', pd.DataFrame())
 
             if medicine_type == "Human Medicine":
-
-                # Upload the file
                 uploaded_file = st.file_uploader("Upload your Drugs with No Patents No Competition file", type=['csv'])
 
                 if uploaded_file is not None:
-                    fda_data = load_data_fda(uploaded_file)
+                    # Load data into session state
+                    st.session_state['fda_data'] = load_data_fda(uploaded_file)
+                    fda_data = st.session_state['fda_data']
 
                     if not fda_data.empty and not mcaz_register.empty:
                         # Filter out products that are in the MCAZ Register
                         filtered_fda_data = filter_fda_data(fda_data, mcaz_register)
+                        st.session_state['filtered_fda_data'] = filtered_fda_data  # Store filtered data in session state
 
                         # Add "None" option and sort filter options
-                        dosage_form_options = ['None'] + sorted(fda_data['DOSAGE FORM'].dropna().unique().tolist())
+                        dosage_form_options = ['None'] + sorted(filtered_fda_data['DOSAGE FORM'].dropna().unique().tolist())
                         selected_dosage_form = st.selectbox("Select Dosage Form", dosage_form_options)
 
-                        type_options = ['None'] + sorted(fda_data['TYPE'].dropna().unique().tolist())
+                        type_options = ['None'] + sorted(filtered_fda_data['TYPE'].dropna().unique().tolist())
                         selected_type = st.selectbox("Select Type", type_options)
 
                         # Apply filters if selections are not "None"
                         if selected_dosage_form != "None":
-                            filtered_fda_data = filtered_fda_data[filtered_fda_data['DOSAGE FORM'] == selected_dosage_form]
+                            st.session_state['filtered_fda_data'] = st.session_state['filtered_fda_data'][st.session_state['filtered_fda_data']['DOSAGE FORM'] == selected_dosage_form]
                         if selected_type != "None":
-                            filtered_fda_data = filtered_fda_data[filtered_fda_data['TYPE'] == selected_type]
+                            st.session_state['filtered_fda_data'] = st.session_state['filtered_fda_data'][st.session_state['filtered_fda_data']['TYPE'] == selected_type]
 
                         # Display the filtered dataframe
                         st.write("Filtered FDA Data (Excluding MCAZ Registered Products):")
-                        st.dataframe(filtered_fda_data)
+                        st.dataframe(st.session_state['filtered_fda_data'])
 
                         # Count and display the number of drugs
-                        drug_count = len(filtered_fda_data)
+                        drug_count = len(st.session_state['filtered_fda_data'])
                         st.write(f"Total Number of Unique Drugs: {drug_count}")
 
                         # Convert the complete DataFrame to CSV
-                        csv_data = convert_df_to_csv(filtered_fda_data)
+                        csv_data = convert_df_to_csv(st.session_state['filtered_fda_data'])
                         st.download_button(
                             label="Download data as CSV",
                             data=csv_data,
                             file_name='fda_nocompetition_product_count.csv',
                             mime='text/csv',
                         )
-
                     else:
                         st.write("Upload a file to see the data or ensure MCAZ Register data is available.")
                 else:
                     st.write("Please upload a file.")
             else:
                 st.write("Select 'Human Medicine' to access FDA drugs analysis.")
-                
+
         # Top Phamra Companies Word wide Sales
         elif choice == 'Top Pharma Companies Sales':
-            st.subheader('Top Pharma Companies World Sales') 
-         
+            st.subheader('Top Pharma Companies World Sales')
+            
+            # Initialize session state for DataFrame if not already present
             if 'df' not in st.session_state:
                 st.session_state.df = pd.DataFrame()
-            
-            # Usage in Streamlit
+
+            # Upload functionality
             uploaded_file = st.file_uploader("Upload your sales data CSV file", type=["csv"])
             if uploaded_file is not None:
+                # Load data into session state only if a new file is uploaded
                 st.session_state.df = load_data_sales(uploaded_file)
-                
-                # Check if the DataFrame is not empty
-                if not st.session_state.df.empty:
 
-                    # Setting up the filters
-                    st.subheader('Filter Options')
-                    # Proceed with processing the DataFrame
-                    # Company Name Filter
-                    company_list = ['All'] + sorted(st.session_state.df['Company Name'].unique().tolist())
-                    company_name = st.selectbox('Company Name', company_list)
+            # Check if the DataFrame is not empty
+            if not st.session_state.df.empty:
+                st.subheader('Filter Options')
 
-                    # Product Name Filter
-                    product_list = ['All'] + sorted(st.session_state.df['Product Name'].unique().tolist())
-                    product_name = st.selectbox('Product Name', product_list)
+                # Dynamic lists for filter options
+                company_list = ['All'] + sorted(st.session_state.df['Company Name'].unique().tolist())
+                product_list = ['All'] + sorted(st.session_state.df['Product Name'].unique().tolist())
+                ingredient_list = ['All'] + sorted(st.session_state.df['Active Ingredient'].fillna('Unknown').unique().tolist())
+                indication_list = ['All'] + sorted(st.session_state.df['Main Therapeutic Indication'].fillna('Unknown').unique().tolist())
+                classification_list = ['All'] + sorted(st.session_state.df['Product Classification'].fillna('Unknown').unique().tolist())
 
-                    # Active Ingredient Filter
-                    ingredient_list = ['All'] + sorted(st.session_state.df['Active Ingredient'].fillna('Unknown').astype(str).unique().tolist())
-                    active_ingredient = st.selectbox('Active Ingredient', ingredient_list)
+                # User filter selections
+                company_name = st.selectbox('Company Name', company_list)
+                product_name = st.selectbox('Product Name', product_list)
+                active_ingredient = st.selectbox('Active Ingredient', ingredient_list)
+                therapeutic_indication = st.selectbox('Main Therapeutic Indication', indication_list)
+                product_classification = st.selectbox('Product Classification', classification_list)
 
-                    # Main Therapeutic Indication Filter
-                    indication_list = ['All'] + sorted(st.session_state.df['Main Therapeutic Indication'].fillna('Unknown').astype(str).unique().tolist())
-                    therapeutic_indication = st.selectbox('Main Therapeutic Indication', indication_list)
+                # Sorting options
+                sort_column = st.selectbox('Sort by', ['2022 Revenue in Millions USD', '2021 Revenue in Millions USD'], index=0)
+                sort_order = st.selectbox('Sort order', ['Ascending', 'Descending'], index=1)
+                is_ascending = sort_order == 'Ascending'
 
-                    # Product Classification Filter
-                    classification_list = ['All'] + sorted(st.session_state.df['Product Classification'].fillna('Unknown').astype(str).unique().tolist())
-                    product_classification = st.selectbox('Product Classification', classification_list)
-                    
-                    # Assuming df is your DataFrame after applying filters
-                    if not st.session_state.df.empty:
-                        # Sorting options with corrected column names
-                        sort_column = st.selectbox(
-                            'Sort by', 
-                            ['2022 Revenue in Millions USD', '2021 Revenue in Millions USD'],  # Corrected column names
-                            index=0  # default selection
-                        )
+                # Apply filters to a local copy of the DataFrame
+                filtered_df = st.session_state.df.copy()
+                if company_name != 'All':
+                    filtered_df = filtered_df[filtered_df['Company Name'] == company_name]
+                if product_name != 'All':
+                    filtered_df = filtered_df[filtered_df['Product Name'] == product_name]
+                if active_ingredient != 'All':
+                    filtered_df = filtered_df[filtered_df['Active Ingredient'] == active_ingredient]
+                if therapeutic_indication != 'All':
+                    filtered_df = filtered_df[filtered_df['Main Therapeutic Indication'] == therapeutic_indication]
+                if product_classification != 'All':
+                    filtered_df = filtered_df[filtered_df['Product Classification'] == product_classification]
 
-                        sort_order = st.selectbox(
-                            'Sort order', 
-                            ['Ascending', 'Descending'], 
-                            index=1  # default to Descending
-                        )
+                # Sort and display the filtered DataFrame
+                if not filtered_df.empty:
+                    filtered_df = filtered_df.sort_values(by=sort_column, ascending=is_ascending)
+                    st.write(filtered_df)
+                else:
+                    st.write("No data to display after filtering.")
 
-                        # Convert sort order to boolean (True for Ascending, False for Descending)
-                        is_ascending = sort_order == 'Ascending'
-
-
-                    # Filtering the data
-                    filtered_df = st.session_state.df
-                    if company_name != 'All':
-                        filtered_df = filtered_df[filtered_df['Company Name'] == company_name]
-                    if product_name != 'All':
-                        filtered_df = filtered_df[filtered_df['Product Name'] == product_name]
-                    if active_ingredient != 'All':
-                        filtered_df = filtered_df[filtered_df['Active Ingredient'] == active_ingredient]
-                    if therapeutic_indication != 'All':
-                        filtered_df = filtered_df[filtered_df['Main Therapeutic Indication'] == therapeutic_indication]
-                    if product_classification != 'All':
-                        filtered_df = filtered_df[filtered_df['Product Classification'] == product_classification]
-
-                    # Displaying the filtered dataframe
-                    if not filtered_df.empty:
-                        # Sort filtered_df by selected column and order
-                        filtered_df = filtered_df.sort_values(by=sort_column, ascending=is_ascending)
-
-                        # Display the sorted and filtered dataframe
-                        st.write(filtered_df)
-                    else:
-                        st.write("No data to display after filtering.")
-
-                    # st.write(filtered_df)
-                    
-                    # Convert the complete DataFrame to CSV
+                # Download button for filtered data
+                if not filtered_df.empty:
                     csv_data = convert_df_to_csv(filtered_df)
                     st.download_button(
                         label="Download data as CSV",
                         data=csv_data,
-                        file_name='world_pharma_sales.csv',
+                        file_name='filtered_data.csv',
                         mime='text/csv',
                     )
-
-                else:
-                    # Display a message if the DataFrame is empty
-                    st.write("Please upload a sales data CSV file to get started.")
-
+            else:
+                st.write("Please upload a sales data CSV file to get started.")
+         
     else:
         st.warning('Please upload MCAZ Register CSV file.')
 
