@@ -347,6 +347,29 @@ def filter_dataframe(df, firm_name, country, operations, registrant_name):
     # Sort the dataframe
     return df.sort_values(by=["FIRM_NAME", "Country", "OPERATIONS", "REGISTRANT_NAME"], ascending=True)
 
+def load_data_nme(uploaded_file):
+    if uploaded_file is not None:
+        df = pd.read_csv(uploaded_file, encoding='latin1')
+
+        # Explicitly check if 'FDA Approval Date' is already in datetime format
+        if not pd.api.types.is_datetime64_any_dtype(df['FDA Approval Date']):
+            try:
+                df['FDA Approval Date'] = pd.to_datetime(df['FDA Approval Date'], errors='coerce')
+            except Exception as e:
+                st.error(f"Error converting FDA Approval Date to datetime: {e}")
+                return None
+
+        # Ensure the conversion was successful by checking for datetime dtype again
+        if pd.api.types.is_datetime64_any_dtype(df['FDA Approval Date']):
+            df['Approval Year'] = df['FDA Approval Date'].dt.year.dropna().astype(int)
+        else:
+            st.error("Failed to convert 'FDA Approval Date' to datetime format.")
+            return None
+
+        return df
+    else:
+        return None
+
 def display_main_application_content():
                         
     # Initialize mcaz_register as an empty DataFrame at the start
@@ -357,7 +380,8 @@ def display_main_application_content():
 
     # Sidebar for navigation
     menu = ['Data Overview', 'Market Analysis', 'Manufacturer Analysis', 'FDA Orange Book Analysis', 
-            'Patient-flow Forecast', 'Drug Classification Analysis', 'Drugs with no Competition', 'Top Pharma Companies Sales', 'FDA Drug Establishment Sites']
+            'Patient-flow Forecast', 'Drug Classification Analysis', 'Drugs with no Competition', 
+            'Top Pharma Companies Sales', 'FDA Drug Establishment Sites', 'FDA NME & New Biologic Approvals']
     choice = st.sidebar.radio("Menu", menu)
     
     # File uploader
@@ -1565,6 +1589,73 @@ def display_main_application_content():
                     file_name='filtered_fda_sites.csv',
                     mime='text/csv',
                 )
+        
+        # FDA Drug Establishment Sites
+        elif choice == 'FDA NME & New Biologic Approvals':
+            st.subheader('FDA NME & New Biologic Approvals')
+            
+            uploaded_file = st.file_uploader("Choose an NME & New Biologics file")
+            if uploaded_file is not None:
+                df_filtered = load_data_nme(uploaded_file)
+                
+                if df_filtered is not None and not df_filtered.empty:
+                    # Ensure 'Approval Year' is treated as integer
+                    df_filtered['Approval Year'] = pd.to_numeric(df_filtered['Approval Year'], downcast='integer', errors='coerce').dropna()
+
+                    if 'Approval Year' in df_filtered:
+                        year_options = range(int(df_filtered['Approval Year'].min()), int(df_filtered['Approval Year'].max()) + 1)
+                        start_year, end_year = st.select_slider(
+                            'Select Approval Year Range:',
+                            options=list(year_options),
+                            value=(min(year_options), max(year_options))
+                        )
+
+                    # Apply year filter
+                    df_filtered = df_filtered[(df_filtered['Approval Year'] >= start_year) & (df_filtered['Approval Year'] <= end_year)]
+
+                    # Additional filters
+                    review_designation_option = st.selectbox('Review Designation', options=['All'] + ['Priority', 'Standard'])
+                    orphan_drug_option = st.checkbox('Orphan Drug Designation')
+                    accelerated_approval_option = st.checkbox('Accelerated Approval')
+                    breakthrough_therapy_option = st.checkbox('Breakthrough Therapy Designation')
+                    fast_track_option = st.checkbox('Fast Track Designation')
+                    qualified_infectious_option = st.checkbox('Qualified Infectious Disease Product')
+
+                    # Apply additional filters
+                    if review_designation_option != 'All':
+                        df_filtered = df_filtered[df_filtered['Review Designation'] == review_designation_option]
+
+                    if orphan_drug_option:
+                        df_filtered = df_filtered[df_filtered['Orphan Drug Designation'] == 'Yes']
+
+                    if accelerated_approval_option:
+                        df_filtered = df_filtered[df_filtered['Accelerated Approval'].notnull()]
+
+                    if breakthrough_therapy_option:
+                        df_filtered = df_filtered[df_filtered['Breakthrough Therapy Designation'].notnull()]
+
+                    if fast_track_option:
+                        df_filtered = df_filtered[df_filtered['Fast Track Designation'].notnull()]
+
+                    if qualified_infectious_option:
+                        df_filtered = df_filtered[df_filtered['Qualified Infectious Disease Product'].notnull()]
+
+                    # Display the filtered dataframe
+                    st.dataframe(df_filtered)
+                    st.write(f"Filtered data count: {len(df_filtered)}")
+                    
+                    # Download button for the filtered dataframe
+                    csv = df_filtered.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="Download filtered data as CSV",
+                        data=csv,
+                        file_name='filtered_fda_nmes_biologics.csv',
+                        mime='text/csv',
+                    )
+                else:
+                    st.write("Please upload a valid CSV file.")
+            else:
+                st.write("Please upload a CSV file to begin.")
         
     else:
         st.warning('Please upload MCAZ Register CSV file.')
