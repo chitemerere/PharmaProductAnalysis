@@ -1612,6 +1612,14 @@ def display_main_application_content():
 
                     # Apply year filter
                     df_filtered = df_filtered[(df_filtered['Approval Year'] >= start_year) & (df_filtered['Approval Year'] <= end_year)]
+                    
+                    # NDA/BLA filter
+                    nda_bla_options = ['All'] + sorted(df_filtered['NDA/BLA'].unique().tolist())
+                    nda_bla_selection = st.selectbox('NDA/BLA', options=nda_bla_options)
+                    
+                    # Filter by NDA/BLA if not 'All'
+                    if nda_bla_selection != 'All':
+                        df_filtered = df_filtered[df_filtered['NDA/BLA'] == nda_bla_selection]
 
                     # Additional filters
                     review_designation_option = st.selectbox('Review Designation', options=['All'] + ['Priority', 'Standard'])
