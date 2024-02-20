@@ -333,7 +333,7 @@ def process_uploaded_file(uploaded_file):
     return df
 
 # Define the filter_dataframe function with the 'Country' filter instead of 'Country Code'
-def filter_dataframe(df, firm_name, country, operations, registrant_name):
+def filter_dataframe_establishments(df, firm_name, country, operations, registrant_name):
     if firm_name != "All":
         df = df[df['FIRM_NAME'] == firm_name]
     if country != "All":
@@ -1251,7 +1251,7 @@ def display_main_application_content():
                 # Download as CSV
                 csv = convert_df_to_csv(merged_df)
                 st.download_button(label="Download data as CSV", data=csv, file_name='fda_orange_book_data.csv', mime='text/csv')
-
+                
                 # Assuming 'merged_df' is your merged DataFrame
                 filtered_columns = [
                     'Ingredient', 'DF;Route', 'Strength', 'Trade_Name', 
@@ -1261,25 +1261,50 @@ def display_main_application_content():
 
                 # Select only the specified columns
                 merged_df = merged_df[filtered_columns]
-
-                # Construct URLs for Patent Numbers only if an ingredient is selected
+                
+                # Check if an ingredient is selected
                 if ingredient != "None":
+                    # Google Patents base URL
+                    google_patents_base_url = "https://patents.google.com/patent/"
+                    # WIPO base URL
                     base_url = "https://patentscope.wipo.int/search/en/search.jsf?query="
-                    merged_df['Patent_Link'] = base_url + merged_df['Patent_No'].astype(str)
-                    merged_df['Patent_Link'] = merged_df['Patent_Link'].apply(lambda x: f'<a href="{x}" target="_blank">{x}</a>')
+
+                    # Construct Google Patents link
+                    merged_df['Google_Patents_Link'] = merged_df['Patent_No'].apply(lambda x: f'<a href="{google_patents_base_url}US{x}B2/en?oq={x}" target="_blank">US{x}B2 on Google Patents</a>')
+
+                    # Construct WIPO link (assuming WIPO docId format is compatible with your Patent_No format; adjust as needed)
+                    merged_df['WIPO_Patent_Link'] = merged_df['Patent_No'].apply(lambda x: f'<a href="{base_url}{x}" target="_blank">{x}</a>')
 
                     # Filter the DataFrame based on the selected ingredient
                     filtered_df = merged_df[merged_df['Ingredient'] == ingredient]
 
-                    # HTML Style for left alignment of the 'Patent_Link' column
-                    left_align_style = "<style>td:nth-child(9) { text-align: left !important; }</style>"
+                    # HTML Style for left alignment of the link columns
+                    left_align_style = "<style>td { text-align: left !important; }</style>"
 
                     # Display the DataFrame with hyperlinks for the selected ingredient
                     st.write(f"DataFrame with Hyperlinked Patent Numbers for Ingredient: {ingredient}")
                     st.markdown(left_align_style + filtered_df.to_html(escape=False, index=False), unsafe_allow_html=True)
-   
                 else:
                     st.write("Please select an ingredient to display detailed information.")
+
+
+#                 # Construct URLs for Patent Numbers only if an ingredient is selected
+#                 if ingredient != "None":
+#                     base_url = "https://patents.google.com/patent/"
+#                     merged_df['Patent_Link'] = merged_df['Patent_No'].apply(lambda x: f'<a href="{base_url}US{x}B2/en?oq={x}" target="_blank">US{x}B2</a>')
+
+#                     # Filter the DataFrame based on the selected ingredient
+#                     filtered_df = merged_df[merged_df['Ingredient'] == ingredient]
+
+#                     # HTML Style for left alignment of the 'Patent_Link' column
+#                     left_align_style = "<style>td:nth-child(9) { text-align: left !important; }</style>"
+
+#                     # Display the DataFrame with hyperlinks for the selected ingredient
+#                     st.write(f"DataFrame with Hyperlinked Patent Numbers for Ingredient: {ingredient}")
+#                     st.markdown(left_align_style + filtered_df.to_html(escape=False, index=False), unsafe_allow_html=True)
+   
+#                 else:
+#                     st.write("Please select an ingredient to display detailed information.")
 
         # Patient Flow Forecasting
         elif choice == 'Patient-flow Forecast':
@@ -1574,7 +1599,7 @@ def display_main_application_content():
                 registrant_name = st.selectbox("Registrant Name", ["All"] + registrant_name_options)
 
                 # Filter the dataframe based on selection
-                filtered_df = filter_dataframe(merged_df, firm_name, country, operations, registrant_name)
+                filtered_df = filter_dataframe_establishments(merged_df, firm_name, country, operations, registrant_name)
 
                 # Save the filtered dataframe in the session state for persistence across modules
                 st.session_state.filtered_data = filtered_df
@@ -1590,7 +1615,7 @@ def display_main_application_content():
                     mime='text/csv',
                 )
         
-        # FDA Drug Establishment Sites
+        # FDA NME & New Biologic Approvals
         elif choice == 'FDA NME & New Biologic Approvals':
             st.subheader('FDA NME & New Biologic Approvals')
             
