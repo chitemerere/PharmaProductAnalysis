@@ -460,6 +460,7 @@ def display_main_application_content():
             # Display the filtered dataframe
             st.write("Filtered Data:")
             st.dataframe(filtered_data)
+            st.write(f"Filtered data count: {len(filtered_data)}")
 
             # Download Dataframe
             csv = convert_df_to_csv(filtered_data)
@@ -509,7 +510,7 @@ def display_main_application_content():
                     if key in st.session_state:
                         del st.session_state[key]
                 st.rerun()
-                # st.experimental_rerun()
+                
                 
             # Display the processed data only if it exists in session state
             if 'fuzzy_matched_data' in st.session_state and not st.session_state.fuzzy_matched_data.empty:
@@ -528,9 +529,7 @@ def display_main_application_content():
                     # ... [Any further operations on mcaz_register]
                 else:
                     st.error("Missing required columns in the dataset.")
-            # else:
-            #     st.warning("Please upload both MCAZ Register and ATC Index files to proceed.")
-
+            
             # Download file
             csv = convert_df_to_csv(mcaz_register)
             if csv is not None:
@@ -1287,25 +1286,6 @@ def display_main_application_content():
                 else:
                     st.write("Please select an ingredient to display detailed information.")
 
-
-#                 # Construct URLs for Patent Numbers only if an ingredient is selected
-#                 if ingredient != "None":
-#                     base_url = "https://patents.google.com/patent/"
-#                     merged_df['Patent_Link'] = merged_df['Patent_No'].apply(lambda x: f'<a href="{base_url}US{x}B2/en?oq={x}" target="_blank">US{x}B2</a>')
-
-#                     # Filter the DataFrame based on the selected ingredient
-#                     filtered_df = merged_df[merged_df['Ingredient'] == ingredient]
-
-#                     # HTML Style for left alignment of the 'Patent_Link' column
-#                     left_align_style = "<style>td:nth-child(9) { text-align: left !important; }</style>"
-
-#                     # Display the DataFrame with hyperlinks for the selected ingredient
-#                     st.write(f"DataFrame with Hyperlinked Patent Numbers for Ingredient: {ingredient}")
-#                     st.markdown(left_align_style + filtered_df.to_html(escape=False, index=False), unsafe_allow_html=True)
-   
-#                 else:
-#                     st.write("Please select an ingredient to display detailed information.")
-
         # Patient Flow Forecasting
         elif choice == 'Patient-flow Forecast':
             st.subheader('Patient-flow Forecast')
@@ -1445,7 +1425,7 @@ def display_main_application_content():
 
             # Medicine type selection
             medicine_type = st.radio("Select Medicine Type", ["Human Medicine", "Veterinary Medicine"])
-            
+                                    
             # Load MCAZ Register data from session state or initialize if not present
             mcaz_register = st.session_state.get('mcaz_register', pd.DataFrame())
 
