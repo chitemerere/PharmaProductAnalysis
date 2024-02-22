@@ -369,6 +369,12 @@ def load_data_nme(uploaded_file):
         return df
     else:
         return None
+    
+# This function now returns an HTML <a> tag for each link
+def construct_espacenet_link(patent_no):
+    espacenet_base_url = "https://worldwide.espacenet.com/searchResults?submitted=true&locale=en_EP&DB=EPODOC&ST=advanced&TI=&AB=&PN="
+    link = f"{espacenet_base_url}{patent_no}&AP=&PR=&PD=&PA=&IN=&CPC=&IC=&Submit=Search"
+    return f'<a href="{link}" target="_blank">{patent_no}</a>'
 
 def display_main_application_content():
                         
@@ -1267,12 +1273,15 @@ def display_main_application_content():
                     google_patents_base_url = "https://patents.google.com/patent/"
                     # WIPO base URL
                     base_url = "https://patentscope.wipo.int/search/en/search.jsf?query="
-
+                                                           
                     # Construct Google Patents link
                     merged_df['Google_Patents_Link'] = merged_df['Patent_No'].apply(lambda x: f'<a href="{google_patents_base_url}US{x}B2/en?oq={x}" target="_blank">US{x}B2 on Google Patents</a>')
 
                     # Construct WIPO link (assuming WIPO docId format is compatible with your Patent_No format; adjust as needed)
                     merged_df['WIPO_Patent_Link'] = merged_df['Patent_No'].apply(lambda x: f'<a href="{base_url}{x}" target="_blank">{x}</a>')
+                    
+                    # Apply the function to the 'Patent_No' column to create a new 'Espacenet_Link' column
+                    merged_df['Espacenet_Link'] = merged_df['Patent_No'].apply(construct_espacenet_link)
 
                     # Filter the DataFrame based on the selected ingredient
                     filtered_df = merged_df[merged_df['Ingredient'] == ingredient]
