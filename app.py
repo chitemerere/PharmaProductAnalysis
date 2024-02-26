@@ -801,11 +801,11 @@ def display_main_application_content():
 
             # Count unique generic names and their frequencies
             unique_generic_name_count = data['Generic Name'].nunique()
-            generic_name_counts = data['Generic Name'].value_counts().head(1000)
+            generic_name_counts = data['Generic Name'].value_counts()
 
             # Display the counts
             st.write(f"Total unique generic names: {unique_generic_name_count}")
-            st.write("Top 1000 Generic Names by Count:")
+            st.write("Top Generic Names by Count:")
             st.dataframe(generic_name_counts)
 
             # Download button for unique product count
@@ -1242,8 +1242,8 @@ def display_main_application_content():
                 applicant = st.selectbox("Select Applicant", ['None'] + sorted(merged_df['Applicant'].dropna().unique().tolist()))
                 appl_type = st.selectbox("Select Appl Type", ['None'] + sorted(merged_df['Appl_Type'].dropna().unique().tolist()))
                 type_filter = st.selectbox("Select Type", ['None'] + sorted(merged_df['Type'].dropna().unique().tolist()))
-                rld = st.selectbox("Select RLD", ['None'] + sorted(merged_df['RLD'].dropna().unique().tolist()))
-                rs = st.selectbox("Select RS", ['None'] + sorted(merged_df['RS'].dropna().unique().tolist()))
+                rld = st.selectbox("Select Rerence Listed Drug", ['None'] + sorted(merged_df['RLD'].dropna().unique().tolist()))
+                rs = st.selectbox("Select Reference Standard", ['None'] + sorted(merged_df['RS'].dropna().unique().tolist()))
                 drug_product_flag = st.selectbox("Select Drug Product Flag", ['None'] + sorted(merged_df['Drug_Product_Flag'].dropna().unique().tolist()))
                 drug_substance_flag = st.selectbox("Select Drug Substance Flag", ['None'] + sorted(merged_df['Drug_Substance_Flag'].dropna().unique().tolist()))
 
