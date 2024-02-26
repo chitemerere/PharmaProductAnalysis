@@ -1650,6 +1650,14 @@ def display_main_application_content():
                     # Filter by NDA/BLA if not 'All'
                     if nda_bla_selection != 'All':
                         df_filtered = df_filtered[df_filtered['NDA/BLA'] == nda_bla_selection]
+                        
+                    # Active Ingredient/Moeity filter
+                    active_ingredient_options = ['All'] + sorted(df_filtered['Active Ingredient/Moiety'].unique().tolist())
+                    active_ingredient_selection = st.selectbox('Active Ingredient/Moiety', options=active_ingredient_options)
+                    
+                    # Filter by Active Ingredient/Moeity if not 'All'
+                    if active_ingredient_selection != 'All':
+                        df_filtered = df_filtered[df_filtered['Active Ingredient/Moiety'] == active_ingredient_selection]
 
                     # Additional filters
                     review_designation_option = st.selectbox('Review Designation', options=['All'] + ['Priority', 'Standard'])
