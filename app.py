@@ -376,6 +376,16 @@ def construct_espacenet_link(patent_no):
     link = f"{espacenet_base_url}{patent_no}&AP=&PR=&PD=&PA=&IN=&CPC=&IC=&Submit=Search"
     return f'<a href="{link}" target="_blank">{patent_no}</a>'
 
+def construct_wipo_link(patent_no):
+    # This is a base URL for initiating a search on WIPO. Adjustments might be needed based on the exact requirement.
+    wipo_search_base_url = "https://patentscope.wipo.int/search/en/search.jsf"
+    # The query parameter 'searchQuery' is assumed to be the way to pre-fill the search; adjust based on actual parameter names.
+    # Note: This is speculative and may not work as expected without the correct parameter names and values.
+    link = f"{wipo_search_base_url}?searchQuery={patent_no}"
+    # Return the HTML anchor tag for the link
+    return f'<a href="{link}" target="_blank">{patent_no}</a>'
+
+
 def display_main_application_content():
                         
     # Initialize mcaz_register as an empty DataFrame at the start
@@ -1234,6 +1244,8 @@ def display_main_application_content():
                 type_filter = st.selectbox("Select Type", ['None'] + sorted(merged_df['Type'].dropna().unique().tolist()))
                 rld = st.selectbox("Select RLD", ['None'] + sorted(merged_df['RLD'].dropna().unique().tolist()))
                 rs = st.selectbox("Select RS", ['None'] + sorted(merged_df['RS'].dropna().unique().tolist()))
+                drug_product_flag = st.selectbox("Select Drug Product Flag", ['None'] + sorted(merged_df['Drug_Product_Flag'].dropna().unique().tolist()))
+                drug_substance_flag = st.selectbox("Select Drug Substance Flag", ['None'] + sorted(merged_df['Drug_Substance_Flag'].dropna().unique().tolist()))
 
                 # Apply filters
                 if ingredient != "None": merged_df = filter_dataframe(merged_df, 'Ingredient', ingredient)
@@ -1244,6 +1256,8 @@ def display_main_application_content():
                 if type_filter != "None": merged_df = filter_dataframe(merged_df, 'Type', type_filter)
                 if rld != "None": merged_df = filter_dataframe(merged_df, 'RLD', rld)
                 if rs != "None": merged_df = filter_dataframe(merged_df, 'RS', rs)
+                if drug_product_flag != "None": merged_df = filter_dataframe(merged_df, 'Drug_Product_Flag', drug_product_flag)
+                if drug_substance_flag != "None": merged_df = filter_dataframe(merged_df, 'Drug_Substance_Flag', drug_substance_flag)
 
                 # Display Dataframe
                 st.write("Filtered FDA Orange Book Data:")
@@ -1278,7 +1292,9 @@ def display_main_application_content():
                     merged_df['Google_Patents_Link'] = merged_df['Patent_No'].apply(lambda x: f'<a href="{google_patents_base_url}US{x}B2/en?oq={x}" target="_blank">US{x}B2 on Google Patents</a>')
 
                     # Construct WIPO link (assuming WIPO docId format is compatible with your Patent_No format; adjust as needed)
-                    merged_df['WIPO_Patent_Link'] = merged_df['Patent_No'].apply(lambda x: f'<a href="{base_url}{x}" target="_blank">{x}</a>')
+#                     merged_df['WIPO_Patent_Link'] = merged_df['Patent_No'].apply(lambda x: f'<a href="{base_url}{x}" target="_blank">{x}</a>')
+                    merged_df['WIPO_Link'] = merged_df['Patent_No'].apply(construct_wipo_link)
+
                     
                     # Apply the function to the 'Patent_No' column to create a new 'Espacenet_Link' column
                     merged_df['Espacenet_Link'] = merged_df['Patent_No'].apply(construct_espacenet_link)
