@@ -1710,13 +1710,7 @@ def display_main_application_content():
         # Assuming 'choice' variable is determined by some user interaction upstream in your code
         if choice == 'EMA FDA Health Canada Approvals 2023':
             st.subheader('EMA FDA Health Canada Approvals 2023')
-            
-            # Provide an option to re-upload and clear the existing data
-            if st.button('Clear data'):
-                if data_key in st.session_state:
-                    del st.session_state[data_key]
-                st.experimental_rerun()
-
+                        
             uploaded_file = st.file_uploader("Choose a EMA FDA Health Canada 2023 Approvals CSV file", type="csv")
 
             if uploaded_file is not None:
@@ -1734,6 +1728,12 @@ def display_main_application_content():
             else:
                 st.warning("Please upload a file to proceed.")
                 return
+            
+            # Provide an option to re-upload and clear the existing data
+            if st.button('Clear data'):
+                if data_key in st.session_state:
+                    del st.session_state[data_key]
+                st.experimental_rerun()
 
             # Initialize or retrieve filter states from session state
             filter_defaults = {
@@ -1791,8 +1791,8 @@ def display_main_application_content():
                 mime='text/csv',
             )
        
-        else:
-            st.warning('Please upload MCAZ Register CSV file.')
+    else:
+        st.warning('Please upload MCAZ Register CSV file.')
 
 def main():
     # Password input
