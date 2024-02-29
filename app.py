@@ -397,7 +397,8 @@ def display_main_application_content():
     # Sidebar for navigation
     menu = ['Data Overview', 'Market Analysis', 'Manufacturer Analysis', 'FDA Orange Book Analysis', 
             'Patient-flow Forecast', 'Drug Classification Analysis', 'Drugs with no Competition', 
-            'Top Pharma Companies Sales', 'FDA Drug Establishment Sites', 'FDA NME & New Biologic Approvals']
+            'Top Pharma Companies Sales', 'FDA Drug Establishment Sites', 'FDA NME & New Biologic Approvals', 
+            'EMA FDA Health Canada Approvals 2023']
     choice = st.sidebar.radio("Menu", menu)
     
     # File uploader
@@ -1703,8 +1704,83 @@ def display_main_application_content():
             else:
                 st.write("Please upload a CSV file to begin.")
         
-    else:
-        st.warning('Please upload MCAZ Register CSV file.')
+        # FDA EMA Health Canada 2023 Approvals
+        elif choice == 'EMA FDA Health Canada Approvals 2023':
+            st.subheader('EMA FDA Health Canada Approvals 2023')
+            
+            # File uploader
+            uploaded_file = st.file_uploader("Choose a EMA FDA Health Canada 2023 Approvals CSV file", type="csv")
+            # Assuming 'uploaded_file' is the variable holding your uploaded file
+            if uploaded_file is not None:
+                # Check if the uploaded file is not empty
+                if uploaded_file.getbuffer().nbytes > 0:
+                    try:
+                        data = pd.read_csv(uploaded_file, encoding='ISO-8859-1')
+                        # Proceed with your data processing and display
+                    except UnicodeDecodeError:
+                        st.error('Failed to read the file due to encoding issues.')
+                    except pd.errors.EmptyDataError:
+                        st.error('The file is empty. Please upload a valid CSV file.')
+                    except Exception as e:
+                        st.error(f'An error occurred: {e}')
+                else:
+                    st.error('The uploaded file is empty. Please upload a valid CSV file.')
+
+                # Filters
+                drug_name = st.selectbox('Drug Name', options=['All'] + sorted(data['Drug Name'].unique().tolist()))
+                company_name = st.selectbox('Company Name', options=['All'] + sorted(data['Company Name'].unique().tolist()))
+                active_ingredient = st.selectbox('Active Ingredient', options=['All'] + sorted(data['Active Ingredient'].unique().tolist()))
+                therapeutic_area = st.selectbox('Therapeutic Area', options=['All'] + sorted(data['Therapeutic Area'].unique().tolist()))
+                product_type = st.selectbox('Product Type', options=['All'] + sorted(data['Product Type'].unique().tolist()))
+                regulatory_authority = st.selectbox('Regulatory Authority', options=['All'] + sorted(data['Regulatory Authority'].unique().tolist()))
+                application_type = st.selectbox('Application Type', options=['All'] + sorted(data['Application Type'].unique().tolist()))
+                drug_type = st.selectbox('Drug Type', options=['All'] + sorted(data['Drug Type'].unique().tolist()))
+
+                # Filtering the dataset based on selections
+                filtered_data = data
+                if drug_name != 'All':
+                    filtered_data = filtered_data[filtered_data['Drug Name'] == drug_name]
+                if company_name != 'All':
+                    filtered_data = filtered_data[filtered_data['Company Name'] == company_name]
+                if active_ingredient != 'All':
+                    filtered_data = filtered_data[filtered_data['Active Ingredient'] == active_ingredient]
+                if therapeutic_area != 'All':
+                    filtered_data = filtered_data[filtered_data['Therapeutic Area'] == therapeutic_area]
+                if product_type != 'All':
+                    filtered_data = filtered_data[filtered_data['Product Type'] == product_type]
+                if regulatory_authority != 'All':
+                    filtered_data = filtered_data[filtered_data['Regulatory Authority'] == regulatory_authority]
+                if application_type != 'All':
+                    filtered_data = filtered_data[filtered_data['Application Type'] == application_type]
+                if drug_type != 'All':
+                    filtered_data = filtered_data[filtered_data['Drug Type'] == drug_type]
+                    
+                # List of columns to remove
+                columns_to_remove = ['Product Status Link', 'Estimated Sales (mm USD) Link']
+
+                # Drop the specified columns from the dataframe, if they exist
+                filtered_data = filtered_data.drop(columns=columns_to_remove, errors='ignore')
+
+                # Displaying the filtered dataset
+                st.write(filtered_data)
+
+                # Display the count of the filtered dataframe
+                st.write(f'Count of filtered results: {len(filtered_data)}')
+
+                # Button to save the filtered data as CSV
+                csv = filtered_data.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="Download filtered data as CSV",
+                    data=csv,
+                    file_name='filtered_fda_ema_healthcanada.csv',
+                    mime='text/csv',
+                )
+                
+            else:
+                st.write("Please upload a valid EMA FDA Health Canada Approvals CSV file.")
+                    
+        else:
+            st.warning('Please upload MCAZ Register CSV file.')
 
 def main():
     # Password input
