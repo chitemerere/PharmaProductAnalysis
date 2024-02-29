@@ -36,6 +36,41 @@ initialize_session_state()
 # Define a key for your upload in session_state to check if the data is already loaded
 data_key = 'ema_fda_healthcanada_data'
 
+def apply_all_filters(df, filter_settings):
+    """
+    Apply all filters to the dataframe based on the filter settings.
+    """
+    # Year range filter
+    if 'year_range' in filter_settings:
+        start_year, end_year = filter_settings['year_range']
+        df = df[(df['Approval Year'] >= start_year) & (df['Approval Year'] <= end_year)]
+
+    # NDA/BLA filter
+    if filter_settings['nda_bla_selection'] != 'All':
+        df = df[df['NDA/BLA'] == filter_settings['nda_bla_selection']]
+
+    # Active Ingredient/Moiety filter
+    if filter_settings['active_ingredient_selection'] != 'All':
+        df = df[df['Active Ingredient/Moiety'] == filter_settings['active_ingredient_selection']]
+
+    # Review Designation filter
+    if filter_settings['review_designation_selection'] != 'All':
+        df = df[df['Review Designation'] == filter_settings['review_designation_selection']]
+
+    # Boolean filters (Yes/No or presence checks)
+    if filter_settings['orphan_drug_option']:
+        df = df[df['Orphan Drug Designation'] == 'Yes']
+    if filter_settings['accelerated_approval_option']:
+        df = df[df['Accelerated Approval'] == 'Yes']
+    if filter_settings['breakthrough_therapy_option']:
+        df = df[df['Breakthrough Therapy Designation'] == 'Yes']
+    if filter_settings['fast_track_option']:
+        df = df[df['Fast Track Designation'] == 'Yes']
+    if filter_settings['qualified_infectious_option']:
+        df = df[df['Qualified Infectious Disease Product'] == 'Yes']
+
+    return df
+
 def safe_load_csv(uploaded_file):
     if uploaded_file is not None and uploaded_file.size > 0:
         return pd.read_csv(uploaded_file)
@@ -1451,59 +1486,60 @@ def display_main_application_content():
         elif choice == 'Drugs with no Competition':
             st.subheader('FDA Drugs with No Patents and No Competition')
             # Implement FDA No Patents analysis
-
+            
             # Medicine type selection
             medicine_type = st.radio("Select Medicine Type", ["Human Medicine", "Veterinary Medicine"])
-                                    
-            # Load MCAZ Register data from session state or initialize if not present
-            mcaz_register = st.session_state.get('mcaz_register', pd.DataFrame())
 
+            # Initialize session state for data if not present
+            if 'fda_data' not in st.session_state:
+                st.session_state['fda_data'] = pd.DataFrame()
+
+            if 'filtered_fda_data' not in st.session_state:
+                st.session_state['filtered_fda_data'] = pd.DataFrame()
+
+            # Condition to check the selected medicine type
             if medicine_type == "Human Medicine":
                 uploaded_file = st.file_uploader("Upload your Drugs with No Patents No Competition file", type=['csv'])
 
                 if uploaded_file is not None:
                     # Load data into session state
                     st.session_state['fda_data'] = load_data_fda(uploaded_file)
-                    fda_data = st.session_state['fda_data']
+                    # Immediately filter or process as needed and update 'filtered_fda_data'
+                    # For simplicity, let's assume the entire dataset is what we want to work with for now
+                    st.session_state['filtered_fda_data'] = st.session_state['fda_data']
 
-                    if not fda_data.empty and not mcaz_register.empty:
-                        # Filter out products that are in the MCAZ Register
-                        filtered_fda_data = filter_fda_data(fda_data, mcaz_register)
-                        st.session_state['filtered_fda_data'] = filtered_fda_data  # Store filtered data in session state
+                if not st.session_state['fda_data'].empty:
+                    # Generate filter options based on 'filtered_fda_data'
+                    dosage_form_options = ['None'] + sorted(st.session_state['filtered_fda_data']['DOSAGE FORM'].dropna().unique().tolist())
+                    selected_dosage_form = st.selectbox("Select Dosage Form", dosage_form_options)
 
-                        # Add "None" option and sort filter options
-                        dosage_form_options = ['None'] + sorted(filtered_fda_data['DOSAGE FORM'].dropna().unique().tolist())
-                        selected_dosage_form = st.selectbox("Select Dosage Form", dosage_form_options)
+                    type_options = ['None'] + sorted(st.session_state['filtered_fda_data']['TYPE'].dropna().unique().tolist())
+                    selected_type = st.selectbox("Select Type", type_options)
 
-                        type_options = ['None'] + sorted(filtered_fda_data['TYPE'].dropna().unique().tolist())
-                        selected_type = st.selectbox("Select Type", type_options)
+                    # Apply filters if selections are not "None"
+                    if selected_dosage_form != "None":
+                        st.session_state['filtered_fda_data'] = st.session_state['filtered_fda_data'][st.session_state['filtered_fda_data']['DOSAGE FORM'] == selected_dosage_form]
+                    if selected_type != "None":
+                        st.session_state['filtered_fda_data'] = st.session_state['filtered_fda_data'][st.session_state['filtered_fda_data']['TYPE'] == selected_type]
 
-                        # Apply filters if selections are not "None"
-                        if selected_dosage_form != "None":
-                            st.session_state['filtered_fda_data'] = st.session_state['filtered_fda_data'][st.session_state['filtered_fda_data']['DOSAGE FORM'] == selected_dosage_form]
-                        if selected_type != "None":
-                            st.session_state['filtered_fda_data'] = st.session_state['filtered_fda_data'][st.session_state['filtered_fda_data']['TYPE'] == selected_type]
+                    # Display the filtered dataframe
+                    st.write("Filtered FDA Data (Excluding MCAZ Registered Products):")
+                    st.dataframe(st.session_state['filtered_fda_data'])
 
-                        # Display the filtered dataframe
-                        st.write("Filtered FDA Data (Excluding MCAZ Registered Products):")
-                        st.dataframe(st.session_state['filtered_fda_data'])
+                    # Count and display the number of drugs
+                    drug_count = len(st.session_state['filtered_fda_data'])
+                    st.write(f"Total Number of Unique Drugs: {drug_count}")
 
-                        # Count and display the number of drugs
-                        drug_count = len(st.session_state['filtered_fda_data'])
-                        st.write(f"Total Number of Unique Drugs: {drug_count}")
-
-                        # Convert the complete DataFrame to CSV
-                        csv_data = convert_df_to_csv(st.session_state['filtered_fda_data'])
-                        st.download_button(
-                            label="Download data as CSV",
-                            data=csv_data,
-                            file_name='fda_nocompetition_product_count.csv',
-                            mime='text/csv',
-                        )
-                    else:
-                        st.write("Upload a file to see the data or ensure MCAZ Register data is available.")
+                    # Convert the complete DataFrame to CSV
+                    csv_data = convert_df_to_csv(st.session_state['filtered_fda_data'])
+                    st.download_button(
+                        label="Download data as CSV",
+                        data=csv_data,
+                        file_name='fda_nocompetition_product_count.csv',
+                        mime='text/csv',
+                    )
                 else:
-                    st.write("Please upload a file.")
+                    st.write("Please upload a file to see the data or ensure MCAZ Register data is available.")
             else:
                 st.write("Select 'Human Medicine' to access FDA drugs analysis.")
 
@@ -1577,42 +1613,46 @@ def display_main_application_content():
                 st.write("Please upload a sales data CSV file to get started.")
         
         # FDA Drug Establishment Sites
-        elif choice == 'FDA Drug Establishment Sites':
+        if choice == 'FDA Drug Establishment Sites':
             st.subheader('FDA Drug Establishment Sites')
-            
-            # File uploader for the Establishment file
-            establishment_file = st.file_uploader("Choose an Establishment CSV file", type="csv")
-            # File uploader for the Country Codes file
-            country_codes_file = st.file_uploader("Choose a Country Codes CSV file", type="csv")
 
-            if establishment_file is not None and country_codes_file is not None:
-                # Process the uploaded files
-                df = process_uploaded_file(establishment_file)
-                country_codes_df = pd.read_csv(country_codes_file)
+            # Checking if the data is already loaded in session state
+            if 'establishment_data' not in st.session_state or 'country_codes_data' not in st.session_state:
+                establishment_file = st.file_uploader("Choose an Establishment CSV file", type="csv", key="est_file")
+                country_codes_file = st.file_uploader("Choose a Country Codes CSV file", type="csv", key="cc_file")
 
+                if establishment_file is not None and country_codes_file is not None:
+                    # Process the uploaded files and store in session state
+                    st.session_state.establishment_data = process_uploaded_file(establishment_file)
+                    st.session_state.country_codes_data = pd.read_csv(country_codes_file)
+
+            if 'establishment_data' in st.session_state and 'country_codes_data' in st.session_state:
                 # Merge the establishment dataframe with the country codes dataframe
-                merged_df = df.merge(country_codes_df, left_on='COUNTRY_CODE', right_on='Alpha-3 code', how='left')
+                merged_df = st.session_state.establishment_data.merge(
+                    st.session_state.country_codes_data, 
+                    left_on='COUNTRY_CODE', 
+                    right_on='Alpha-3 code', 
+                    how='left'
+                )
 
                 # Ensure all values are strings for sorting and filtering
                 merged_df.fillna('Unknown', inplace=True)
 
-                # Dropdowns for filtering with sorted options
-                firm_name_options = sorted(merged_df['FIRM_NAME'].unique().tolist())
-                country_options = sorted(merged_df['Country'].unique().tolist())  # Changed to 'Country'
-                operations_options = sorted(merged_df['OPERATIONS'].unique().tolist(), key=lambda x: (x is np.nan, x))
-                registrant_name_options = sorted(merged_df['REGISTRANT_NAME'].unique().tolist())
+                # UI for filtering
+                firm_name_options = ["All"] + sorted(merged_df['FIRM_NAME'].unique().tolist())
+                country_options = ["All"] + sorted(merged_df['Country'].unique().tolist())
+                operations_options = ["All"] + sorted(merged_df['OPERATIONS'].unique().tolist(), key=lambda x: (x is np.nan, x))
+                registrant_name_options = ["All"] + sorted(merged_df['REGISTRANT_NAME'].unique().tolist())
 
-                firm_name = st.selectbox("Firm Name", ["All"] + firm_name_options)
-                country = st.selectbox("Country", ["All"] + country_options)  # Changed to 'Country'
-                operations = st.selectbox("Operations", ["All"] + operations_options)
-                registrant_name = st.selectbox("Registrant Name", ["All"] + registrant_name_options)
+                firm_name = st.selectbox("Firm Name", firm_name_options)
+                country = st.selectbox("Country", country_options)
+                operations = st.selectbox("Operations", operations_options)
+                registrant_name = st.selectbox("Registrant Name", registrant_name_options)
 
                 # Filter the dataframe based on selection
                 filtered_df = filter_dataframe_establishments(merged_df, firm_name, country, operations, registrant_name)
 
-                # Save the filtered dataframe in the session state for persistence across modules
-                st.session_state.filtered_data = filtered_df
-
+                # Displaying the filtered dataframe
                 st.dataframe(filtered_df)
 
                 # Download button for the filtered dataframe
@@ -1623,90 +1663,90 @@ def display_main_application_content():
                     file_name='filtered_fda_sites.csv',
                     mime='text/csv',
                 )
-        
+            else:
+                st.warning("Please upload both files to proceed.")
+                        
         # FDA NME & New Biologic Approvals
-        elif choice == 'FDA NME & New Biologic Approvals':
+        if choice == 'FDA NME & New Biologic Approvals':
             st.subheader('FDA NME & New Biologic Approvals')
-            
+
             uploaded_file = st.file_uploader("Choose an NME & New Biologics file")
             if uploaded_file is not None:
+                # Process and store the uploaded data only if a new file is provided
                 df_filtered = load_data_nme(uploaded_file)
-                
-                if df_filtered is not None and not df_filtered.empty:
-                    # Ensure 'Approval Year' is treated as integer
-                    df_filtered['Approval Year'] = pd.to_numeric(df_filtered['Approval Year'], downcast='integer', errors='coerce').dropna()
-
-                    if 'Approval Year' in df_filtered:
-                        year_options = range(int(df_filtered['Approval Year'].min()), int(df_filtered['Approval Year'].max()) + 1)
-                        start_year, end_year = st.select_slider(
-                            'Select Approval Year Range:',
-                            options=list(year_options),
-                            value=(min(year_options), max(year_options))
-                        )
-
-                    # Apply year filter
-                    df_filtered = df_filtered[(df_filtered['Approval Year'] >= start_year) & (df_filtered['Approval Year'] <= end_year)]
-                    
-                    # NDA/BLA filter
-                    nda_bla_options = ['All'] + sorted(df_filtered['NDA/BLA'].unique().tolist())
-                    nda_bla_selection = st.selectbox('NDA/BLA', options=nda_bla_options)
-                    
-                    # Filter by NDA/BLA if not 'All'
-                    if nda_bla_selection != 'All':
-                        df_filtered = df_filtered[df_filtered['NDA/BLA'] == nda_bla_selection]
-                        
-                    # Active Ingredient/Moeity filter
-                    active_ingredient_options = ['All'] + sorted(df_filtered['Active Ingredient/Moiety'].unique().tolist())
-                    active_ingredient_selection = st.selectbox('Active Ingredient/Moiety', options=active_ingredient_options)
-                    
-                    # Filter by Active Ingredient/Moeity if not 'All'
-                    if active_ingredient_selection != 'All':
-                        df_filtered = df_filtered[df_filtered['Active Ingredient/Moiety'] == active_ingredient_selection]
-
-                    # Additional filters
-                    review_designation_option = st.selectbox('Review Designation', options=['All'] + ['Priority', 'Standard'])
-                    orphan_drug_option = st.checkbox('Orphan Drug Designation')
-                    accelerated_approval_option = st.checkbox('Accelerated Approval')
-                    breakthrough_therapy_option = st.checkbox('Breakthrough Therapy Designation')
-                    fast_track_option = st.checkbox('Fast Track Designation')
-                    qualified_infectious_option = st.checkbox('Qualified Infectious Disease Product')
-
-                    # Apply additional filters
-                    if review_designation_option != 'All':
-                        df_filtered = df_filtered[df_filtered['Review Designation'] == review_designation_option]
-
-                    if orphan_drug_option:
-                        df_filtered = df_filtered[df_filtered['Orphan Drug Designation'] == 'Yes']
-
-                    if accelerated_approval_option:
-                        df_filtered = df_filtered[df_filtered['Accelerated Approval'].notnull()]
-
-                    if breakthrough_therapy_option:
-                        df_filtered = df_filtered[df_filtered['Breakthrough Therapy Designation'].notnull()]
-
-                    if fast_track_option:
-                        df_filtered = df_filtered[df_filtered['Fast Track Designation'].notnull()]
-
-                    if qualified_infectious_option:
-                        df_filtered = df_filtered[df_filtered['Qualified Infectious Disease Product'].notnull()]
-
-                    # Display the filtered dataframe
-                    st.dataframe(df_filtered)
-                    st.write(f"Filtered data count: {len(df_filtered)}")
-                    
-                    # Download button for the filtered dataframe
-                    csv = df_filtered.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label="Download filtered data as CSV",
-                        data=csv,
-                        file_name='filtered_fda_nmes_biologics.csv',
-                        mime='text/csv',
-                    )
-                else:
-                    st.write("Please upload a valid CSV file.")
+                # Reset filters if a new file is uploaded
+                st.session_state['nme_biologics_data'] = df_filtered
+                st.session_state['nme_biologics_filters'] = {}
+            elif 'nme_biologics_data' in st.session_state:
+                # Use previously loaded data
+                df_filtered = st.session_state['nme_biologics_data']
             else:
-                st.write("Please upload a CSV file to begin.")
-                
+                st.warning("Please upload a file to begin.")
+                st.stop()
+
+            # Initialize or retrieve filter settings from session state
+            filter_settings = st.session_state.get('nme_biologics_filters', {})
+
+            # Define UI for all filters and update filter_settings based on user input
+            # Approval Year Range
+            if 'Approval Year' in df_filtered:
+                year_options = range(int(df_filtered['Approval Year'].min()), int(df_filtered['Approval Year'].max()) + 1)
+                start_year, end_year = st.select_slider(
+                    'Select Approval Year Range:',
+                    options=list(year_options),
+                    value=filter_settings.get('year_range', (min(year_options), max(year_options)))
+                )
+                filter_settings['year_range'] = (start_year, end_year)
+
+            # NDA/BLA
+            nda_bla_options = ['All'] + sorted(df_filtered['NDA/BLA'].unique().tolist())
+            nda_bla_selection = st.selectbox('NDA/BLA', options=nda_bla_options, index=0)
+            filter_settings['nda_bla_selection'] = nda_bla_selection
+
+            # Active Ingredient/Moiety
+            active_ingredient_options = ['All'] + sorted(df_filtered['Active Ingredient/Moiety'].unique().tolist())
+            active_ingredient_selection = st.selectbox('Active Ingredient/Moiety', options=active_ingredient_options, index=0)
+            filter_settings['active_ingredient_selection'] = active_ingredient_selection
+
+            # Additional Filters
+            review_designation_options = ['All', 'Priority', 'Standard']
+            review_designation_selection = st.selectbox('Review Designation', options=review_designation_options, index=0)
+            filter_settings['review_designation_selection'] = review_designation_selection
+
+            orphan_drug_option = st.checkbox('Orphan Drug Designation', value='Orphan Drug Designation' in filter_settings)
+            filter_settings['orphan_drug_option'] = orphan_drug_option
+
+            accelerated_approval_option = st.checkbox('Accelerated Approval', value='Accelerated Approval' in filter_settings)
+            filter_settings['accelerated_approval_option'] = accelerated_approval_option
+
+            breakthrough_therapy_option = st.checkbox('Breakthrough Therapy Designation', value='Breakthrough Therapy Designation' in filter_settings)
+            filter_settings['breakthrough_therapy_option'] = breakthrough_therapy_option
+
+            fast_track_option = st.checkbox('Fast Track Designation', value='Fast Track Designation' in filter_settings)
+            filter_settings['fast_track_option'] = fast_track_option
+
+            qualified_infectious_option = st.checkbox('Qualified Infectious Disease Product', value='Qualified Infectious Disease Product' in filter_settings)
+            filter_settings['qualified_infectious_option'] = qualified_infectious_option
+
+            # Apply filters based on user selection
+            df_filtered = apply_all_filters(df_filtered, filter_settings)
+
+            # Update session state with the latest filter settings
+            st.session_state['nme_biologics_filters'] = filter_settings
+
+            # Display the filtered dataframe
+            st.dataframe(df_filtered)
+            st.write(f"Filtered data count: {len(df_filtered)}")
+
+            # Download button for the filtered dataframe
+            csv = df_filtered.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="Download filtered data as CSV",
+                data=csv,
+                file_name='filtered_fda_nmes_biologics.csv',
+                mime='text/csv',
+            )
+                      
         # Assuming 'choice' variable is determined by some user interaction upstream in your code
         if choice == 'EMA FDA Health Canada Approvals 2023':
             st.subheader('EMA FDA Health Canada Approvals 2023')
