@@ -319,6 +319,58 @@ def process_data(mcaz_register, atc_index, extract_atc_levels):
         st.error("Processing time could not be calculated due to missing start or end time.")
     st.session_state.fuzzy_matched_data = mcaz_register  # Save processed data for later use
     
+def process_data_fda(fda_register, atc_index, extract_atc_levels):
+     # Ensure start_time is set at the beginning of processing
+    if 'start_time' not in st.session_state or st.session_state.start_time is None:
+        st.session_state.start_time = datetime.now(harare_timezone)  # or datetime.now(harare_timezone) if timezone is relevant
+        
+    # Ensure 'Name' in ATC index is string
+    atc_index['Name'] = atc_index['Name'].astype(str)
+
+    name_to_atc_code = dict(zip(atc_index['Name'], atc_index['ATCCode']))
+    total_rows = len(fda_register)
+    processed_rows = st.session_state.get('processed_rows', 0)
+
+    # Initialize progress bar and display processing message
+    progress_bar = st.progress(0)
+    st.subheader('Processing and mapping data...')
+    st.session_state.start_time = datetime.now(harare_timezone) 
+    st.write(f"Processing started at: {st.session_state.start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+    for index, row in fda_register.iloc[processed_rows:].iterrows():
+        # Processing logic (omitted for brevity)
+        if not st.session_state.get('resume_processing', True):
+            break  # Pause processing
+        
+        match_result = process.extractOne(row['Ingredient'], atc_index['Name'], scorer=fuzz.ratio)
+        best_match_name, match_score = match_result[0], match_result[1] if match_result else (None, 0)
+        atc_code = name_to_atc_code.get(best_match_name, None)
+
+        fda_register.at[index, 'Best Match Name'] = best_match_name
+        fda_register.at[index, 'Match Score'] = match_score
+        fda_register.at[index, 'ATCCode'] = atc_code
+
+        progress = int(((index - processed_rows + 1) / (total_rows - processed_rows)) * 100)
+        progress_bar.progress(progress)
+        st.session_state.processed_rows = index + 1
+        
+        # Update progress
+        progress = int(((index - processed_rows + 1) / total_rows) * 100)
+        progress_bar.progress(progress)
+        st.session_state.processed_rows = index + 1
+
+    # Finalize progress and display completion message
+    progress_bar.progress(100)
+    st.session_state.end_time = datetime.now(harare_timezone)
+    # Safely calculate processing time
+    if st.session_state.start_time is not None and st.session_state.end_time is not None:
+        processing_time = st.session_state.end_time - st.session_state.start_time
+        st.write(f"Processing completed at: {st.session_state.end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        st.write(f"Total processing time: {processing_time}")
+    else:
+        st.error("Processing time could not be calculated due to missing start or end time.")
+    st.session_state.fuzzy_matched_data = fda_register  # Save processed data for later use
+    
 def check_required_columns(dataframe, required_columns, atc_level):
     if dataframe is not None:
         missing_columns = [column for column in required_columns if column not in dataframe.columns]
@@ -1349,6 +1401,209 @@ def display_main_application_content():
                     st.markdown(left_align_style + filtered_df.to_html(escape=False, index=False), unsafe_allow_html=True)
                 else:
                     st.write("Please select an ingredient to display detailed information.")
+                    
+            # Start of the Streamlit UI layout
+            st.subheader("FDA Data Processing with Fuzzy Matching and ATC Code Extraction")
+
+            medicine_type = st.radio("Select Medicine Type", ["Human Medicine", "Veterinary Medicine"])
+
+            # Initialize or ensure session state variables are available
+            if 'fuzzy_matched_data' not in st.session_state:
+                st.session_state.fuzzy_matched_data = pd.DataFrame()
+            if 'atc_level_data' not in st.session_state:
+                st.session_state.atc_level_data = pd.DataFrame()
+            if 'fda_register' not in st.session_state:
+                st.session_state.fda_register = pd.DataFrame()
+
+            fda_register_file = st.file_uploader("Upload FDA Register File", type=['csv'], key="fda_register_uploader")
+            atc_index_file = st.file_uploader(f"Upload {'Human' if medicine_type == 'Human Medicine' else 'Veterinary'} ATC Index File", type=['csv'], key="atc_index_uploader")
+                        
+            if 'processed_rows' not in st.session_state:
+                st.session_state.processed_rows = 0
+            if 'resume_processing' not in st.session_state:
+                st.session_state.resume_processing = False
+
+            if fda_register_file and atc_index_file:
+                st.session_state.fda_register = load_file(fda_register_file)
+                atc_index = load_file(atc_index_file)
+                st.session_state.fda_register = init_columns(st.session_state.fda_register)
+                
+                # Retain only the specified columns
+                columns_to_keep = ['Ingredient', 'DF;Route', 'Strength', 'Trade_Name', 'Applicant']
+                st.session_state.fda_register = st.session_state.fda_register[columns_to_keep]
+
+                extract_atc_levels = extract_atc_levels_human if medicine_type == 'Human Medicine' else extract_atc_levels_veterinary
+
+                if st.button("Start/Resume Processing"):
+                    st.session_state.resume_processing = True
+                    process_data_fda(st.session_state.fda_register, atc_index, extract_atc_levels)
+
+                    # Assuming process_data_fda updates st.session_state.fda_register or another relevant session state variable
+            else:
+                st.error("Please upload both FDA Register and ATC Index files to proceed.")
+
+            if st.button("Reset Processing"):
+                for key in ['processed_rows', 'resume_processing', 'start_time', 'end_time', 'fuzzy_matched_data', 'atc_level_data', 'fda_register']:
+                    if key in st.session_state:
+                        del st.session_state[key]
+                st.experimental_rerun()
+
+            if 'fuzzy_matched_data' in st.session_state and not st.session_state.fuzzy_matched_data.empty:
+                st.write("Updated FDA Register with Fuzzy Matching and ATC Codes:")
+                st.dataframe(st.session_state.fuzzy_matched_data)
+
+                csv_data = convert_df_to_csv(st.session_state.fuzzy_matched_data)
+                st.download_button(label="Download FDA Register as CSV", data=csv_data, file_name='fda_register_with_atc_codes.csv', mime='text/csv')
+            else:
+                st.write("No processed data available for download or processing not yet started.")
+                
+            if st.session_state.fuzzy_matched_data is not None:
+                try:
+                    st.session_state.fuzzy_matched_data = st.session_state.fuzzy_matched_data[['Ingredient', 'DF;Route', 'Strength', 'Trade_Name', 'Applicant', 'Best Match Name', 'Match Score', 'ATCCode']]
+
+                    # Convert all strings in the DataFrame to uppercase
+                    for column in st.session_state.fuzzy_matched_data.columns:
+                        st.session_state.fuzzy_matched_data[column] = st.session_state.fuzzy_matched_data[column].map(lambda x: x.upper() if isinstance(x, str) else x)
+
+                    # Assuming extract_atc_levels_human and extract_atc_levels_veterinary are defined
+                    extract_atc_levels = extract_atc_levels_human if medicine_type == 'Human Medicine' else extract_atc_levels_veterinary
+
+                    # Apply the function to each ATC code in the DataFrame
+                    atc_data = st.session_state.fuzzy_matched_data['ATCCode'].apply(lambda x: pd.Series(extract_atc_levels(x)))
+                    atc_data.columns = ['ATCLevelOneCode', 'ATCLevelTwoCode', 'ATCLevelThreeCode', 'ATCLevelFourCode']
+                    st.session_state.fuzzy_matched_data = pd.concat([st.session_state.fuzzy_matched_data, atc_data], axis=1)
+
+                    st.session_state.atc_level_data = st.session_state.fuzzy_matched_data
+
+                    if not st.session_state.atc_level_data.empty:
+                        st.write("Updated FDA Register with ATC Level Codes:")
+                        st.dataframe(st.session_state.atc_level_data)
+
+                        # Download file
+                        csv = convert_df_to_csv(st.session_state.atc_level_data)
+                        st.download_button(label="Download FDA Register as CSV", data=csv, file_name='fda_register_with_ATC_Level_Codes.csv', mime='text/csv', key='download_fda_updated_register')
+                except KeyError as e:
+                    print(f"Column not found in DataFrame: {e}")
+            else:
+                print("fda_register is None. Please check data loading and processing steps.")
+                
+            # Streamlit UI layout for ATC Code Description Integration and Filtering
+            st.subheader("FDA Orange Book ATC Code Description Integration and Filtering")
+
+            # Initialize variables for ATC data and filter variables
+            atc_one = atc_two = atc_three = atc_four = None
+            atc_one_desc = atc_two_desc = atc_three_desc = atc_four_desc = selected_generic_names = []
+            
+            # Required columns for each ATC level
+            required_columns_atc_one = ['ATCLevelOneCode', 'ATCLevelOneDescript']
+            required_columns_atc_two = ['ATCLevelTwoCode', 'ATCLevelTwoDescript']
+            required_columns_atc_three = ['ATCLevelThreeCode', 'ATCLevelThreeDescript']
+            required_columns_atc_four = ['ATCLevelFourCode', 'Chemical Subgroup']
+
+            # File uploaders for ATC level description files
+            atc_one_file = st.file_uploader("Upload ATC Level One Description File", type=['csv'], key="atc_one_uploader_one")
+            atc_two_file = st.file_uploader("Upload ATC Level Two Description File", type=['csv'], key="atc_two_uploader_two")
+            atc_three_file = st.file_uploader("Upload ATC Level Three Description File", type=['csv'], key="atc_three_uploader_three")
+            atc_four_file = st.file_uploader("Upload ATC Level Four Description File", type=['csv'], key="atc_four_uploader_four")
+            
+            # Button to trigger the check operation
+            check_data = st.button("Check Required Columns")
+
+            if check_data:
+                # Load ATC description files if uploaded
+                atc_one = safe_load_csv(atc_one_file) if atc_one_file else None
+                atc_two = safe_load_csv(atc_two_file) if atc_two_file else None
+                atc_three = safe_load_csv(atc_three_file) if atc_three_file else None
+                atc_four = safe_load_csv(atc_four_file) if atc_four_file else None
+
+                # Check for required columns in each ATC level description file
+                check_required_columns(atc_one, required_columns_atc_one, "One")
+                check_required_columns(atc_two, required_columns_atc_two, "Two")
+                check_required_columns(atc_three, required_columns_atc_three, "Three")
+                check_required_columns(atc_four, required_columns_atc_four, "Four")
+            else:
+                st.info("Please upload ATC level description files and press 'Check Required Columns'.")
+
+            # Button to trigger the merge operation
+            merge_data = st.button("Merge Data")
+
+            if merge_data and 'fuzzy_matched_data' in st.session_state and not st.session_state.fuzzy_matched_data.empty:
+                # Load ATC description files if uploaded
+                atc_one = safe_load_csv(atc_one_file) if atc_one_file else None
+                atc_two = safe_load_csv(atc_two_file) if atc_two_file else None
+                atc_three = safe_load_csv(atc_three_file) if atc_three_file else None
+                atc_four = safe_load_csv(atc_four_file) if atc_four_file else None
+              
+                # Retrieve the fuzzy_matched_data from session state
+                st.session_state.fuzzy_matched_data =  st.session_state.atc_level_data
+
+                # Merge with ATC level descriptions
+                with st.spinner('Merging data with ATC level descriptions...'):
+                    if atc_one is not None and 'ATCLevelOneCode' in st.session_state.fuzzy_matched_data.columns:
+                        st.session_state.fuzzy_matched_data = st.session_state.fuzzy_matched_data.merge(atc_one, on='ATCLevelOneCode', how='left')
+                    if atc_two is not None and 'ATCLevelTwoCode' in st.session_state.fuzzy_matched_data.columns:
+                        st.session_state.fuzzy_matched_data = st.session_state.fuzzy_matched_data.merge(atc_two, on='ATCLevelTwoCode', how='left')
+                    if atc_three is not None and 'ATCLevelThreeCode' in st.session_state.fuzzy_matched_data.columns:
+                        st.session_state.fuzzy_matched_data = st.session_state.fuzzy_matched_data.merge(atc_three, on='ATCLevelThreeCode', how='left')
+                    if atc_four is not None and 'ATCLevelFourCode' in st.session_state.fuzzy_matched_data.columns:
+                        st.session_state.fuzzy_matched_data = st.session_state.fuzzy_matched_data.merge(atc_four, on='ATCLevelFourCode', how='left')
+
+                # Correctly update the session state with the merged data
+                st.session_state['fda_with_ATCCodeDescription'] = st.session_state.fuzzy_matched_data
+                st.success("Data merged with ATC level descriptions.")
+                
+                # Display the merged dataframe
+                if not st.session_state.fuzzy_matched_data.empty:
+                    st.write("Merged Data:")
+                    st.dataframe(st.session_state.fuzzy_matched_data)
+                else:
+                    st.write("No data to display after merging.")
+
+           
+            else:
+                st.warning("Please complete the fuzzy matching process and ensure ATC level description files are uploaded and merged.")
+            
+            # Download file
+            csv = convert_df_to_csv(mcaz_register)
+            if csv is not None:
+                # Proceed with operations that use 'csv'
+                st.download_button(label="Download FDA Register as CSV", data=csv, file_name='fda_register_with_atc_description.csv', mime='text/csv', key='download_mcaz_withatcdescription_fda')
+
+            else:
+                # Handle the case where 'csv' is None, e.g., display a message or take alternative action
+                print("No data available to convert to CSV")
+
+            # Filters
+            filter_options = ["None", "ATCLevelOneDescript", "ATCLevelTwoDescript", "ATCLevelThreeDescript", "Chemical Subgroup", "Generic Name"]
+            selected_filter = st.radio("Select a filter", filter_options)
+
+            # Initialize an empty DataFrame for filtered_data to handle its scope outside the if condition
+            filtered_data = pd.DataFrame()
+
+            if selected_filter != "None" and not st.session_state.get('fda_with_ATCCodeDescription', pd.DataFrame()).empty:
+                # Convert all values to string and sort
+                filter_values = sorted(st.session_state['fda_with_ATCCodeDescription'][selected_filter].astype(str).unique())
+                selected_values = st.multiselect(f"Select {selected_filter}", filter_values)
+
+                if selected_values:
+                    # Filter the dataframe only if the selection is not empty
+                    filtered_data = st.session_state['fda_with_ATCCodeDescription'][
+                        st.session_state['fda_with_ATCCodeDescription'][selected_filter].astype(str).isin(selected_values)
+                    ]
+                    st.write(f"Filtered Data by {selected_filter}:")
+                    st.dataframe(filtered_data)
+                    st.write(f"Filtered data count: {len(filtered_data)}")
+                else:
+                    st.write("No filter applied.")
+
+            # Check if there is filtered data to download
+            if not filtered_data.empty:
+                csv = convert_df_to_csv(filtered_data)
+                st.download_button(label="Download FDA Register as CSV", data=csv, file_name='fda_register_filtered.csv', mime='text/csv', key='download_fda_register_filtered')
+            else:
+                # This else block could be optional based on whether you want to display a message when there's no data to download
+                st.write("No data available to download.")
+               
 
         # Patient Flow Forecasting
         elif choice == 'Patient-flow Forecast':
@@ -1486,60 +1741,59 @@ def display_main_application_content():
         elif choice == 'Drugs with no Competition':
             st.subheader('FDA Drugs with No Patents and No Competition')
             # Implement FDA No Patents analysis
-            
+
             # Medicine type selection
             medicine_type = st.radio("Select Medicine Type", ["Human Medicine", "Veterinary Medicine"])
+                                    
+            # Load MCAZ Register data from session state or initialize if not present
+            mcaz_register = st.session_state.get('mcaz_register', pd.DataFrame())
 
-            # Initialize session state for data if not present
-            if 'fda_data' not in st.session_state:
-                st.session_state['fda_data'] = pd.DataFrame()
-
-            if 'filtered_fda_data' not in st.session_state:
-                st.session_state['filtered_fda_data'] = pd.DataFrame()
-
-            # Condition to check the selected medicine type
             if medicine_type == "Human Medicine":
                 uploaded_file = st.file_uploader("Upload your Drugs with No Patents No Competition file", type=['csv'])
 
                 if uploaded_file is not None:
                     # Load data into session state
                     st.session_state['fda_data'] = load_data_fda(uploaded_file)
-                    # Immediately filter or process as needed and update 'filtered_fda_data'
-                    # For simplicity, let's assume the entire dataset is what we want to work with for now
-                    st.session_state['filtered_fda_data'] = st.session_state['fda_data']
+                    fda_data = st.session_state['fda_data']
 
-                if not st.session_state['fda_data'].empty:
-                    # Generate filter options based on 'filtered_fda_data'
-                    dosage_form_options = ['None'] + sorted(st.session_state['filtered_fda_data']['DOSAGE FORM'].dropna().unique().tolist())
-                    selected_dosage_form = st.selectbox("Select Dosage Form", dosage_form_options)
+                    if not fda_data.empty and not mcaz_register.empty:
+                        # Filter out products that are in the MCAZ Register
+                        filtered_fda_data = filter_fda_data(fda_data, mcaz_register)
+                        st.session_state['filtered_fda_data'] = filtered_fda_data  # Store filtered data in session state
 
-                    type_options = ['None'] + sorted(st.session_state['filtered_fda_data']['TYPE'].dropna().unique().tolist())
-                    selected_type = st.selectbox("Select Type", type_options)
+                        # Add "None" option and sort filter options
+                        dosage_form_options = ['None'] + sorted(filtered_fda_data['DOSAGE FORM'].dropna().unique().tolist())
+                        selected_dosage_form = st.selectbox("Select Dosage Form", dosage_form_options)
 
-                    # Apply filters if selections are not "None"
-                    if selected_dosage_form != "None":
-                        st.session_state['filtered_fda_data'] = st.session_state['filtered_fda_data'][st.session_state['filtered_fda_data']['DOSAGE FORM'] == selected_dosage_form]
-                    if selected_type != "None":
-                        st.session_state['filtered_fda_data'] = st.session_state['filtered_fda_data'][st.session_state['filtered_fda_data']['TYPE'] == selected_type]
+                        type_options = ['None'] + sorted(filtered_fda_data['TYPE'].dropna().unique().tolist())
+                        selected_type = st.selectbox("Select Type", type_options)
 
-                    # Display the filtered dataframe
-                    st.write("Filtered FDA Data (Excluding MCAZ Registered Products):")
-                    st.dataframe(st.session_state['filtered_fda_data'])
+                        # Apply filters if selections are not "None"
+                        if selected_dosage_form != "None":
+                            st.session_state['filtered_fda_data'] = st.session_state['filtered_fda_data'][st.session_state['filtered_fda_data']['DOSAGE FORM'] == selected_dosage_form]
+                        if selected_type != "None":
+                            st.session_state['filtered_fda_data'] = st.session_state['filtered_fda_data'][st.session_state['filtered_fda_data']['TYPE'] == selected_type]
 
-                    # Count and display the number of drugs
-                    drug_count = len(st.session_state['filtered_fda_data'])
-                    st.write(f"Total Number of Unique Drugs: {drug_count}")
+                        # Display the filtered dataframe
+                        st.write("Filtered FDA Data (Excluding MCAZ Registered Products):")
+                        st.dataframe(st.session_state['filtered_fda_data'])
 
-                    # Convert the complete DataFrame to CSV
-                    csv_data = convert_df_to_csv(st.session_state['filtered_fda_data'])
-                    st.download_button(
-                        label="Download data as CSV",
-                        data=csv_data,
-                        file_name='fda_nocompetition_product_count.csv',
-                        mime='text/csv',
-                    )
+                        # Count and display the number of drugs
+                        drug_count = len(st.session_state['filtered_fda_data'])
+                        st.write(f"Total Number of Unique Drugs: {drug_count}")
+
+                        # Convert the complete DataFrame to CSV
+                        csv_data = convert_df_to_csv(st.session_state['filtered_fda_data'])
+                        st.download_button(
+                            label="Download data as CSV",
+                            data=csv_data,
+                            file_name='fda_nocompetition_product_count.csv',
+                            mime='text/csv',
+                        )
+                    else:
+                        st.write("Upload a file to see the data or ensure MCAZ Register data is available.")
                 else:
-                    st.write("Please upload a file to see the data or ensure MCAZ Register data is available.")
+                    st.write("Please upload a file.")
             else:
                 st.write("Select 'Human Medicine' to access FDA drugs analysis.")
 
@@ -1613,46 +1867,42 @@ def display_main_application_content():
                 st.write("Please upload a sales data CSV file to get started.")
         
         # FDA Drug Establishment Sites
-        if choice == 'FDA Drug Establishment Sites':
+        elif choice == 'FDA Drug Establishment Sites':
             st.subheader('FDA Drug Establishment Sites')
+            
+            # File uploader for the Establishment file
+            establishment_file = st.file_uploader("Choose an Establishment CSV file", type="csv")
+            # File uploader for the Country Codes file
+            country_codes_file = st.file_uploader("Choose a Country Codes CSV file", type="csv")
 
-            # Checking if the data is already loaded in session state
-            if 'establishment_data' not in st.session_state or 'country_codes_data' not in st.session_state:
-                establishment_file = st.file_uploader("Choose an Establishment CSV file", type="csv", key="est_file")
-                country_codes_file = st.file_uploader("Choose a Country Codes CSV file", type="csv", key="cc_file")
+            if establishment_file is not None and country_codes_file is not None:
+                # Process the uploaded files
+                df = process_uploaded_file(establishment_file)
+                country_codes_df = pd.read_csv(country_codes_file)
 
-                if establishment_file is not None and country_codes_file is not None:
-                    # Process the uploaded files and store in session state
-                    st.session_state.establishment_data = process_uploaded_file(establishment_file)
-                    st.session_state.country_codes_data = pd.read_csv(country_codes_file)
-
-            if 'establishment_data' in st.session_state and 'country_codes_data' in st.session_state:
                 # Merge the establishment dataframe with the country codes dataframe
-                merged_df = st.session_state.establishment_data.merge(
-                    st.session_state.country_codes_data, 
-                    left_on='COUNTRY_CODE', 
-                    right_on='Alpha-3 code', 
-                    how='left'
-                )
+                merged_df = df.merge(country_codes_df, left_on='COUNTRY_CODE', right_on='Alpha-3 code', how='left')
 
                 # Ensure all values are strings for sorting and filtering
                 merged_df.fillna('Unknown', inplace=True)
 
-                # UI for filtering
-                firm_name_options = ["All"] + sorted(merged_df['FIRM_NAME'].unique().tolist())
-                country_options = ["All"] + sorted(merged_df['Country'].unique().tolist())
-                operations_options = ["All"] + sorted(merged_df['OPERATIONS'].unique().tolist(), key=lambda x: (x is np.nan, x))
-                registrant_name_options = ["All"] + sorted(merged_df['REGISTRANT_NAME'].unique().tolist())
+                # Dropdowns for filtering with sorted options
+                firm_name_options = sorted(merged_df['FIRM_NAME'].unique().tolist())
+                country_options = sorted(merged_df['Country'].unique().tolist())  # Changed to 'Country'
+                operations_options = sorted(merged_df['OPERATIONS'].unique().tolist(), key=lambda x: (x is np.nan, x))
+                registrant_name_options = sorted(merged_df['REGISTRANT_NAME'].unique().tolist())
 
-                firm_name = st.selectbox("Firm Name", firm_name_options)
-                country = st.selectbox("Country", country_options)
-                operations = st.selectbox("Operations", operations_options)
-                registrant_name = st.selectbox("Registrant Name", registrant_name_options)
+                firm_name = st.selectbox("Firm Name", ["All"] + firm_name_options)
+                country = st.selectbox("Country", ["All"] + country_options)  # Changed to 'Country'
+                operations = st.selectbox("Operations", ["All"] + operations_options)
+                registrant_name = st.selectbox("Registrant Name", ["All"] + registrant_name_options)
 
                 # Filter the dataframe based on selection
                 filtered_df = filter_dataframe_establishments(merged_df, firm_name, country, operations, registrant_name)
 
-                # Displaying the filtered dataframe
+                # Save the filtered dataframe in the session state for persistence across modules
+                st.session_state.filtered_data = filtered_df
+
                 st.dataframe(filtered_df)
 
                 # Download button for the filtered dataframe
@@ -1663,9 +1913,8 @@ def display_main_application_content():
                     file_name='filtered_fda_sites.csv',
                     mime='text/csv',
                 )
-            else:
-                st.warning("Please upload both files to proceed.")
-                        
+                
+        ##
         # FDA NME & New Biologic Approvals
         if choice == 'FDA NME & New Biologic Approvals':
             st.subheader('FDA NME & New Biologic Approvals')
@@ -1746,7 +1995,91 @@ def display_main_application_content():
                 file_name='filtered_fda_nmes_biologics.csv',
                 mime='text/csv',
             )
-                      
+        ##
+        
+#         # FDA NME & New Biologic Approvals
+#         elif choice == 'FDA NME & New Biologic Approvals':
+#             st.subheader('FDA NME & New Biologic Approvals')
+            
+#             uploaded_file = st.file_uploader("Choose an NME & New Biologics file")
+#             if uploaded_file is not None:
+#                 df_filtered = load_data_nme(uploaded_file)
+                
+#                 if df_filtered is not None and not df_filtered.empty:
+#                     # Ensure 'Approval Year' is treated as integer
+#                     df_filtered['Approval Year'] = pd.to_numeric(df_filtered['Approval Year'], downcast='integer', errors='coerce').dropna()
+
+#                     if 'Approval Year' in df_filtered:
+#                         year_options = range(int(df_filtered['Approval Year'].min()), int(df_filtered['Approval Year'].max()) + 1)
+#                         start_year, end_year = st.select_slider(
+#                             'Select Approval Year Range:',
+#                             options=list(year_options),
+#                             value=(min(year_options), max(year_options))
+#                         )
+
+#                     # Apply year filter
+#                     df_filtered = df_filtered[(df_filtered['Approval Year'] >= start_year) & (df_filtered['Approval Year'] <= end_year)]
+                    
+#                     # NDA/BLA filter
+#                     nda_bla_options = ['All'] + sorted(df_filtered['NDA/BLA'].unique().tolist())
+#                     nda_bla_selection = st.selectbox('NDA/BLA', options=nda_bla_options)
+                    
+#                     # Filter by NDA/BLA if not 'All'
+#                     if nda_bla_selection != 'All':
+#                         df_filtered = df_filtered[df_filtered['NDA/BLA'] == nda_bla_selection]
+                        
+#                     # Active Ingredient/Moeity filter
+#                     active_ingredient_options = ['All'] + sorted(df_filtered['Active Ingredient/Moiety'].unique().tolist())
+#                     active_ingredient_selection = st.selectbox('Active Ingredient/Moiety', options=active_ingredient_options)
+                    
+#                     # Filter by Active Ingredient/Moeity if not 'All'
+#                     if active_ingredient_selection != 'All':
+#                         df_filtered = df_filtered[df_filtered['Active Ingredient/Moiety'] == active_ingredient_selection]
+
+#                     # Additional filters
+#                     review_designation_option = st.selectbox('Review Designation', options=['All'] + ['Priority', 'Standard'])
+#                     orphan_drug_option = st.checkbox('Orphan Drug Designation')
+#                     accelerated_approval_option = st.checkbox('Accelerated Approval')
+#                     breakthrough_therapy_option = st.checkbox('Breakthrough Therapy Designation')
+#                     fast_track_option = st.checkbox('Fast Track Designation')
+#                     qualified_infectious_option = st.checkbox('Qualified Infectious Disease Product')
+
+#                     # Apply additional filters
+#                     if review_designation_option != 'All':
+#                         df_filtered = df_filtered[df_filtered['Review Designation'] == review_designation_option]
+
+#                     if orphan_drug_option:
+#                         df_filtered = df_filtered[df_filtered['Orphan Drug Designation'] == 'Yes']
+
+#                     if accelerated_approval_option:
+#                         df_filtered = df_filtered[df_filtered['Accelerated Approval'].notnull()]
+
+#                     if breakthrough_therapy_option:
+#                         df_filtered = df_filtered[df_filtered['Breakthrough Therapy Designation'].notnull()]
+
+#                     if fast_track_option:
+#                         df_filtered = df_filtered[df_filtered['Fast Track Designation'].notnull()]
+
+#                     if qualified_infectious_option:
+#                         df_filtered = df_filtered[df_filtered['Qualified Infectious Disease Product'].notnull()]
+
+#                     # Display the filtered dataframe
+#                     st.dataframe(df_filtered)
+#                     st.write(f"Filtered data count: {len(df_filtered)}")
+                    
+#                     # Download button for the filtered dataframe
+#                     csv = df_filtered.to_csv(index=False).encode('utf-8')
+#                     st.download_button(
+#                         label="Download filtered data as CSV",
+#                         data=csv,
+#                         file_name='filtered_fda_nmes_biologics.csv',
+#                         mime='text/csv',
+#                     )
+#                 else:
+#                     st.write("Please upload a valid CSV file.")
+#             else:
+#                 st.write("Please upload a CSV file to begin.")
+                
         # Assuming 'choice' variable is determined by some user interaction upstream in your code
         if choice == 'EMA FDA Health Canada Approvals 2023':
             st.subheader('EMA FDA Health Canada Approvals 2023')
