@@ -337,7 +337,8 @@ def process_data_fda(fda_register, atc_index, extract_atc_levels):
     st.session_state.start_time = datetime.now(harare_timezone) 
     st.write(f"Processing started at: {st.session_state.start_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
-    for index, row in fda_register.iloc[processed_rows:].iterrows():
+#     for index, row in fda_register.iloc[processed_rows:].iterrows():
+    for index, row in st.session_state.fda_register.iterrows(): 
         # Processing logic (omitted for brevity)
         if not st.session_state.get('resume_processing', True):
             break  # Pause processing
@@ -349,16 +350,16 @@ def process_data_fda(fda_register, atc_index, extract_atc_levels):
         fda_register.at[index, 'Best Match Name'] = best_match_name
         fda_register.at[index, 'Match Score'] = match_score
         fda_register.at[index, 'ATCCode'] = atc_code
-
+        
         progress = int(((index - processed_rows + 1) / (total_rows - processed_rows)) * 100)
         progress_bar.progress(progress)
         st.session_state.processed_rows = index + 1
         
         # Update progress
-        progress = int(((index - processed_rows + 1) / total_rows) * 100)
+        progress = int((processed_rows + index) / total_rows * 100)
+        progress = min(progress, 100)  # Ensure progress does not exceed 100%
         progress_bar.progress(progress)
-        st.session_state.processed_rows = index + 1
-
+    
     # Finalize progress and display completion message
     progress_bar.progress(100)
     st.session_state.end_time = datetime.now(harare_timezone)
@@ -1425,13 +1426,18 @@ def display_main_application_content():
 
             if fda_register_file and atc_index_file:
                 st.session_state.fda_register = load_file(fda_register_file)
+                # Specify the columns to consider for identifying duplicates
+                columns_for_deduplication = ['Ingredient', 'DF;Route', 'Strength', 'Trade_Name', 'Applicant']
+
+                # Remove duplicates based on the specified columns
+                st.session_state.fda_register = st.session_state.fda_register.drop_duplicates(subset=columns_for_deduplication)
                 atc_index = load_file(atc_index_file)
                 st.session_state.fda_register = init_columns(st.session_state.fda_register)
                 
                 # Retain only the specified columns
                 columns_to_keep = ['Ingredient', 'DF;Route', 'Strength', 'Trade_Name', 'Applicant']
                 st.session_state.fda_register = st.session_state.fda_register[columns_to_keep]
-
+                
                 extract_atc_levels = extract_atc_levels_human if medicine_type == 'Human Medicine' else extract_atc_levels_veterinary
 
                 if st.button("Start/Resume Processing"):
