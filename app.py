@@ -356,18 +356,20 @@ def process_data_fda(fda_register, atc_index, extract_atc_levels):
 #         st.session_state.processed_rows = index + 1
         # Check if total_rows - processed_rows is not zero
         try:
-            # Check if total_rows - processed_rows is not zero
             if total_rows - processed_rows != 0:
                 progress = int(((index - processed_rows + 1) / (total_rows - processed_rows)) * 100)
+                # Ensure progress is within 0 to 100 range
+                progress = max(0, min(progress, 100))
             else:
-                # If total_rows - processed_rows is zero, set progress to 100
                 progress = 100
 
             progress_bar.progress(progress)
             st.session_state.processed_rows = index + 1
         except StreamlitAPIException as e:
-            # Handle the exception gracefully
             st.error(f"An error occurred: {e}")
+            # For debugging:
+            st.error(f"Progress value causing error: {progress}")
+
 #         if total_rows - processed_rows != 0:
 #             progress = int(((index - processed_rows + 1) / (total_rows - processed_rows)) * 100)
 #         else:
