@@ -351,7 +351,16 @@ def process_data_fda(fda_register, atc_index, extract_atc_levels):
         fda_register.at[index, 'Match Score'] = match_score
         fda_register.at[index, 'ATCCode'] = atc_code
         
-        progress = int(((index - processed_rows + 1) / (total_rows - processed_rows)) * 100)
+#         progress = int(((index - processed_rows + 1) / (total_rows - processed_rows)) * 100)
+#         progress_bar.progress(progress)
+#         st.session_state.processed_rows = index + 1
+        # Check if total_rows - processed_rows is not zero
+        if total_rows - processed_rows != 0:
+            progress = int(((index - processed_rows + 1) / (total_rows - processed_rows)) * 100)
+        else:
+            # If total_rows - processed_rows is zero, set progress to 100
+            progress = 100
+
         progress_bar.progress(progress)
         st.session_state.processed_rows = index + 1
         
