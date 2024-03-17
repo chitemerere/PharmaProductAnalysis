@@ -1564,7 +1564,7 @@ def display_main_application_content():
                 st.warning("Please complete the fuzzy matching process and ensure ATC level description files are uploaded and merged.")
             
             # Download file
-            csv = convert_df_to_csv(mcaz_register)
+            csv = convert_df_to_csv(st.session_state.fuzzy_matched_data)
             if csv is not None:
                 # Proceed with operations that use 'csv'
                 st.download_button(label="Download FDA Register as CSV", data=csv, file_name='fda_register_with_atc_description.csv', mime='text/csv', key='download_mcaz_withatcdescription_fda')
