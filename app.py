@@ -356,10 +356,15 @@ def process_data_fda(fda_register, atc_index, extract_atc_levels):
         st.session_state.processed_rows = index + 1
         
         # Update progress
-        progress = int((processed_rows / total_rows) * 100)
-        # Ensure progress is within 0 to 100 range
-        progress = max(0, min(progress, 100))
+        progress = int(((index - processed_rows + 1) / total_rows) * 100)
         progress_bar.progress(progress)
+        st.session_state.processed_rows = index + 1
+        
+#         # Update progress
+#         progress = int((processed_rows / total_rows) * 100)
+#         # Ensure progress is within 0 to 100 range
+#         progress = max(0, min(progress, 100))
+#         progress_bar.progress(progress)
         
 #         progress = int((processed_rows + index) / total_rows * 100)
 #         progress = min(progress, 100)  # Ensure progress does not exceed 100%
