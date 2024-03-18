@@ -346,54 +346,20 @@ def process_data_fda(fda_register, atc_index, extract_atc_levels):
         match_result = process.extractOne(row['Ingredient'], atc_index['Name'], scorer=fuzz.ratio)
         best_match_name, match_score = match_result[0], match_result[1] if match_result else (None, 0)
         atc_code = name_to_atc_code.get(best_match_name, None)
-
+        
         fda_register.at[index, 'Best Match Name'] = best_match_name
         fda_register.at[index, 'Match Score'] = match_score
         fda_register.at[index, 'ATCCode'] = atc_code
         
-#         progress = int(((index - processed_rows + 1) / (total_rows - processed_rows)) * 100)
-#         progress_bar.progress(progress)
-#         st.session_state.processed_rows = index + 1
-        # Check if total_rows - processed_rows is not zero
-        try:
-            if total_rows - processed_rows != 0:
-                progress = int(((index - processed_rows + 1) / (total_rows - processed_rows)) * 100)
-                # Ensure progress is within 0 to 100 range
-                progress = max(0, min(progress, 100))
-            else:
-                progress = 100
-
-            progress_bar.progress(progress)
-            st.session_state.processed_rows = index + 1
-        except StreamlitAPIException as e:
-            st.error(f"An error occurred: {e}")
-            # For debugging:
-            st.error(f"Progress value causing error: {progress}")
-
-#         if total_rows - processed_rows != 0:
-#             progress = int(((index - processed_rows + 1) / (total_rows - processed_rows)) * 100)
-#         else:
-#             # If total_rows - processed_rows is zero, set progress to 100
-#             progress = 100
-
-#         progress_bar.progress(progress)
-#         st.session_state.processed_rows = index + 1
+        progress = int(((index - processed_rows + 1) / (total_rows - processed_rows)) * 100)
+        progress_bar.progress(progress)
+        st.session_state.processed_rows = index + 1
         
         # Update progress
         progress = int(((index - processed_rows + 1) / total_rows) * 100)
         progress_bar.progress(progress)
         st.session_state.processed_rows = index + 1
-        
-#         # Update progress
-#         progress = int((processed_rows / total_rows) * 100)
-#         # Ensure progress is within 0 to 100 range
-#         progress = max(0, min(progress, 100))
-#         progress_bar.progress(progress)
-        
-#         progress = int((processed_rows + index) / total_rows * 100)
-#         progress = min(progress, 100)  # Ensure progress does not exceed 100%
-#         progress_bar.progress(progress)
-    
+  
     # Finalize progress and display completion message
     progress_bar.progress(100)
     st.session_state.end_time = datetime.now(harare_timezone)
@@ -1460,11 +1426,6 @@ def display_main_application_content():
 
             if fda_register_file and atc_index_file:
                 st.session_state.fda_register = load_file(fda_register_file)
-                # Specify the columns to consider for identifying duplicates
-                columns_for_deduplication = ['Ingredient', 'DF;Route', 'Strength', 'Trade_Name', 'Applicant']
-
-                # Remove duplicates based on the specified columns
-                st.session_state.fda_register = st.session_state.fda_register.drop_duplicates(subset=columns_for_deduplication)
                 atc_index = load_file(atc_index_file)
                 st.session_state.fda_register = init_columns(st.session_state.fda_register)
                 
@@ -1477,8 +1438,7 @@ def display_main_application_content():
                 if st.button("Start/Resume Processing"):
                     st.session_state.resume_processing = True
                     process_data_fda(st.session_state.fda_register, atc_index, extract_atc_levels)
-
-                    # Assuming process_data_fda updates st.session_state.fda_register or another relevant session state variable
+                   
             else:
                 st.error("Please upload both FDA Register and ATC Index files to proceed.")
 
