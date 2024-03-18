@@ -372,15 +372,31 @@ def process_data_fda(fda_register, atc_index, extract_atc_levels):
         st.error("Processing time could not be calculated due to missing start or end time.")
     st.session_state.fuzzy_matched_data = fda_register  # Save processed data for later use
     
-def check_required_columns(dataframe, required_columns, atc_level):
-    if dataframe is not None:
-        missing_columns = [column for column in required_columns if column not in dataframe.columns]
+def check_required_columns(df, required_columns, level):
+    """
+    Checks if the required columns are present in the dataframe.
+    If not, displays a warning message and updates the session state to indicate the check failed.
+    """
+    if df is not None:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            st.warning(f"Missing required columns for ATC Level {level}: {', '.join(missing_columns)}")
+            st.session_state['check_passed'] = False
         if not missing_columns:
-            st.success(f"All required columns for ATC Level {atc_level} are present.")
-        else:
-            st.error(f"Missing required columns for ATC Level {atc_level}: {', '.join(missing_columns)}")
+            st.success(f"All required column for ATC Level {level} are present.")
     else:
-        st.warning(f"No file uploaded for ATC Level {atc_level}.")
+        st.warning(f"No file uploaded for ATC Level {level}.")
+        st.session_state['check_passed'] = False
+    
+# def check_required_columns(dataframe, required_columns, atc_level):
+#     if dataframe is not None:
+#         missing_columns = [column for column in required_columns if column not in dataframe.columns]
+#         if not missing_columns:
+#             st.success(f"All required columns for ATC Level {atc_level} are present.")
+#         else:
+#             st.error(f"Missing required columns for ATC Level {atc_level}: {', '.join(missing_columns)}")
+#     else:
+#         st.warning(f"No file uploaded for ATC Level {atc_level}.")
         
 # Function to check for required columns in the uploaded file
 def check_required_columns_in_file(file, required_columns):
@@ -680,11 +696,15 @@ def display_main_application_content():
 
             # Streamlit UI layout for ATC Code Description Integration and Filtering
             st.subheader("ATC Code Description Integration and Filtering")
+            
+            # Initialize session state for check_passed
+            if 'check_passed' not in st.session_state:
+                st.session_state['check_passed'] = False
 
             # Initialize variables for ATC data and filter variables
             atc_one = atc_two = atc_three = atc_four = None
             atc_one_desc = atc_two_desc = atc_three_desc = atc_four_desc = selected_generic_names = []
-            
+
             # Required columns for each ATC level
             required_columns_atc_one = ['ATCLevelOneCode', 'ATCLevelOneDescript']
             required_columns_atc_two = ['ATCLevelTwoCode', 'ATCLevelTwoDescript']
@@ -692,15 +712,18 @@ def display_main_application_content():
             required_columns_atc_four = ['ATCLevelFourCode', 'Chemical Subgroup']
 
             # File uploaders for ATC level description files
-            atc_one_file = st.file_uploader("Upload ATC Level One Description File", type=['csv'], key="atc_one_uploader")
-            atc_two_file = st.file_uploader("Upload ATC Level Two Description File", type=['csv'], key="atc_two_uploader")
-            atc_three_file = st.file_uploader("Upload ATC Level Three Description File", type=['csv'], key="atc_three_uploader")
-            atc_four_file = st.file_uploader("Upload ATC Level Four Description File", type=['csv'], key="atc_four_uploader")
-            
+            atc_one_file = st.file_uploader("Upload ATC Level One Description File", type=['csv'], key="atc_one_uploader_one")
+            atc_two_file = st.file_uploader("Upload ATC Level Two Description File", type=['csv'], key="atc_two_uploader_two")
+            atc_three_file = st.file_uploader("Upload ATC Level Three Description File", type=['csv'], key="atc_three_uploader_three")
+            atc_four_file = st.file_uploader("Upload ATC Level Four Description File", type=['csv'], key="atc_four_uploader_four")
+
             # Button to trigger the check operation
             check_data = st.button("Check Required Columns")
 
             if check_data:
+                # Reset the check_passed flag
+                st.session_state['check_passed'] = True
+
                 # Load ATC description files if uploaded
                 atc_one = safe_load_csv(atc_one_file) if atc_one_file else None
                 atc_two = safe_load_csv(atc_two_file) if atc_two_file else None
@@ -712,48 +735,54 @@ def display_main_application_content():
                 check_required_columns(atc_two, required_columns_atc_two, "Two")
                 check_required_columns(atc_three, required_columns_atc_three, "Three")
                 check_required_columns(atc_four, required_columns_atc_four, "Four")
+                
             else:
                 st.info("Please upload ATC level description files and press 'Check Required Columns'.")
 
             # Button to trigger the merge operation
             merge_data = st.button("Merge Data")
 
-            if merge_data and 'fuzzy_matched_data' in st.session_state and not st.session_state.fuzzy_matched_data.empty:
-                # Load ATC description files if uploaded
-                atc_one = safe_load_csv(atc_one_file) if atc_one_file else None
-                atc_two = safe_load_csv(atc_two_file) if atc_two_file else None
-                atc_three = safe_load_csv(atc_three_file) if atc_three_file else None
-                atc_four = safe_load_csv(atc_four_file) if atc_four_file else None
-              
-                # Retrieve the fuzzy_matched_data from session state
-                mcaz_register =  st.session_state.atc_level_data
+            if merge_data:
+                if 'fuzzy_matched_data' in st.session_state and not st.session_state.fuzzy_matched_data.empty:
+                    if st.session_state['check_passed']:  # Check if all required columns are present
+                        # Your merging logic here...
+                        # Load ATC description files if uploaded
+                        atc_one = safe_load_csv(atc_one_file) if atc_one_file else None
+                        atc_two = safe_load_csv(atc_two_file) if atc_two_file else None
+                        atc_three = safe_load_csv(atc_three_file) if atc_three_file else None
+                        atc_four = safe_load_csv(atc_four_file) if atc_four_file else None
+                        
+                        # Retrieve the fuzzy_matched_data from session state
+                        mcaz_register =  st.session_state.atc_level_data
 
-                # Merge with ATC level descriptions
-                with st.spinner('Merging data with ATC level descriptions...'):
-                    if atc_one is not None and 'ATCLevelOneCode' in mcaz_register.columns:
-                        mcaz_register = mcaz_register.merge(atc_one, on='ATCLevelOneCode', how='left')
-                    if atc_two is not None and 'ATCLevelTwoCode' in mcaz_register.columns:
-                        mcaz_register = mcaz_register.merge(atc_two, on='ATCLevelTwoCode', how='left')
-                    if atc_three is not None and 'ATCLevelThreeCode' in mcaz_register.columns:
-                        mcaz_register = mcaz_register.merge(atc_three, on='ATCLevelThreeCode', how='left')
-                    if atc_four is not None and 'ATCLevelFourCode' in mcaz_register.columns:
-                        mcaz_register = mcaz_register.merge(atc_four, on='ATCLevelFourCode', how='left')
+                        # Merge with ATC level descriptions
+                        with st.spinner('Merging data with ATC level descriptions...'):
+                            if atc_one is not None and 'ATCLevelOneCode' in mcaz_register.columns:
+                                mcaz_register = mcaz_register.merge(atc_one, on='ATCLevelOneCode', how='left')
+                            if atc_two is not None and 'ATCLevelTwoCode' in mcaz_register.columns:
+                                mcaz_register = mcaz_register.merge(atc_two, on='ATCLevelTwoCode', how='left')
+                            if atc_three is not None and 'ATCLevelThreeCode' in mcaz_register.columns:
+                                mcaz_register = mcaz_register.merge(atc_three, on='ATCLevelThreeCode', how='left')
+                            if atc_four is not None and 'ATCLevelFourCode' in mcaz_register.columns:
+                                mcaz_register = mcaz_register.merge(atc_four, on='ATCLevelFourCode', how='left')
 
-                # Correctly update the session state with the merged data
-                st.session_state['mcaz_with_ATCCodeDescription'] = mcaz_register
-                st.success("Data merged with ATC level descriptions.")
-                
-                # Display the merged dataframe
-                if not mcaz_register.empty:
-                    st.write("Merged Data:")
-                    st.dataframe(mcaz_register)
+                        # Correctly update the session state with the merged data
+                        st.session_state['mcaz_with_ATCCodeDescription'] = mcaz_register
+                        st.success("Data merged with ATC level descriptions.")
+
+                        # Display the merged dataframe
+                        if not mcaz_register.empty:
+                            st.write("Merged Data:")
+                            st.dataframe(mcaz_register)
+                        else:
+                            st.write("No data to display after merging.")
+
+                        st.success("Data merged with ATC level descriptions.")
+                    else:
+                        st.error("Cannot merge data. Please ensure all required columns are present and try again.")
                 else:
-                    st.write("No data to display after merging.")
+                    st.warning("Please complete the fuzzy matching process and ensure ATC level description files are uploaded.")
 
-           
-            else:
-                st.warning("Please complete the fuzzy matching process and ensure ATC level description files are uploaded and merged.")
-            
             # Download file
             csv = convert_df_to_csv(mcaz_register)
             if csv is not None:
@@ -1490,10 +1519,14 @@ def display_main_application_content():
             # Streamlit UI layout for ATC Code Description Integration and Filtering
             st.subheader("FDA Orange Book ATC Code Description Integration and Filtering")
 
+            # Initialize session state for check_passed
+            if 'check_passed' not in st.session_state:
+                st.session_state['check_passed'] = False
+
             # Initialize variables for ATC data and filter variables
             atc_one = atc_two = atc_three = atc_four = None
             atc_one_desc = atc_two_desc = atc_three_desc = atc_four_desc = selected_generic_names = []
-            
+
             # Required columns for each ATC level
             required_columns_atc_one = ['ATCLevelOneCode', 'ATCLevelOneDescript']
             required_columns_atc_two = ['ATCLevelTwoCode', 'ATCLevelTwoDescript']
@@ -1505,11 +1538,14 @@ def display_main_application_content():
             atc_two_file = st.file_uploader("Upload ATC Level Two Description File", type=['csv'], key="atc_two_uploader_two")
             atc_three_file = st.file_uploader("Upload ATC Level Three Description File", type=['csv'], key="atc_three_uploader_three")
             atc_four_file = st.file_uploader("Upload ATC Level Four Description File", type=['csv'], key="atc_four_uploader_four")
-            
+
             # Button to trigger the check operation
             check_data = st.button("Check Required Columns")
 
             if check_data:
+                # Reset the check_passed flag
+                st.session_state['check_passed'] = True
+
                 # Load ATC description files if uploaded
                 atc_one = safe_load_csv(atc_one_file) if atc_one_file else None
                 atc_two = safe_load_csv(atc_two_file) if atc_two_file else None
@@ -1521,6 +1557,7 @@ def display_main_application_content():
                 check_required_columns(atc_two, required_columns_atc_two, "Two")
                 check_required_columns(atc_three, required_columns_atc_three, "Three")
                 check_required_columns(atc_four, required_columns_atc_four, "Four")
+                
             else:
                 st.info("Please upload ATC level description files and press 'Check Required Columns'.")
 
@@ -1529,36 +1566,37 @@ def display_main_application_content():
 
             if merge_data:
                 if 'fuzzy_matched_data' in st.session_state and not st.session_state.fuzzy_matched_data.empty:
-                    # Assume atc_one_file, atc_two_file, atc_three_file, atc_four_file are defined elsewhere
-                    # Load ATC description files if uploaded
-                    atc_one = safe_load_csv(atc_one_file) if atc_one_file else None
-                    atc_two = safe_load_csv(atc_two_file) if atc_two_file else None
-                    atc_three = safe_load_csv(atc_three_file) if atc_three_file else None
-                    atc_four = safe_load_csv(atc_four_file) if atc_four_file else None
-
-                    # Note: The previous line that sets fuzzy_matched_data to atc_level_data seems incorrect and was removed.
-                    # Merge with ATC level descriptions
-                    with st.spinner('Merging data with ATC level descriptions...'):
-                        merged_data = st.session_state.fuzzy_matched_data.copy()  # Work on a copy to prevent modifying the original data prematurely
-                        if atc_one is not None and 'ATCLevelOneCode' in merged_data.columns:
-                            merged_data = merged_data.merge(atc_one, on='ATCLevelOneCode', how='left')
-                        if atc_two is not None and 'ATCLevelTwoCode' in merged_data.columns:
-                            merged_data = merged_data.merge(atc_two, on='ATCLevelTwoCode', how='left')
-                        if atc_three is not None and 'ATCLevelThreeCode' in merged_data.columns:
-                            merged_data = merged_data.merge(atc_three, on='ATCLevelThreeCode', how='left')
-                        if atc_four is not None and 'ATCLevelFourCode' in merged_data.columns:
-                            merged_data = merged_data.merge(atc_four, on='ATCLevelFourCode', how='left')
-
+                    if st.session_state['check_passed']:  # Check if all required columns are present
+                        # Your merging logic here...
+                        # Load ATC description files if uploaded
+                        atc_one = safe_load_csv(atc_one_file) if atc_one_file else None
+                        atc_two = safe_load_csv(atc_two_file) if atc_two_file else None
+                        atc_three = safe_load_csv(atc_three_file) if atc_three_file else None
+                        atc_four = safe_load_csv(atc_four_file) if atc_four_file else None
+                        # Merge with ATC level descriptions
+                        with st.spinner('Merging data with ATC level descriptions...'):
+                            merged_data = st.session_state.fuzzy_matched_data.copy()  # Work on a copy to prevent modifying the original data prematurely
+                            if atc_one is not None and 'ATCLevelOneCode' in merged_data.columns:
+                                merged_data = merged_data.merge(atc_one, on='ATCLevelOneCode', how='left')
+                            if atc_two is not None and 'ATCLevelTwoCode' in merged_data.columns:
+                                merged_data = merged_data.merge(atc_two, on='ATCLevelTwoCode', how='left')
+                            if atc_three is not None and 'ATCLevelThreeCode' in merged_data.columns:
+                                merged_data = merged_data.merge(atc_three, on='ATCLevelThreeCode', how='left')
+                            if atc_four is not None and 'ATCLevelFourCode' in merged_data.columns:
+                                merged_data = merged_data.merge(atc_four, on='ATCLevelFourCode', how='left')
+                                
                         # Save the merged data in session state under a new key
                         st.session_state['fda_with_ATCCodeDescription'] = merged_data
-                        st.success("Data merged with ATC level descriptions.")
-
                         # Display the merged dataframe
                         if not merged_data.empty:
                             st.write("Merged Data:")
                             st.dataframe(merged_data)
                         else:
                             st.write("No data to display after merging.")
+
+                        st.success("Data merged with ATC level descriptions.")
+                    else:
+                        st.error("Cannot merge data. Please ensure all required columns are present and try again.")
                 else:
                     st.warning("Please complete the fuzzy matching process and ensure ATC level description files are uploaded.")
 
