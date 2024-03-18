@@ -1527,42 +1527,41 @@ def display_main_application_content():
             # Button to trigger the merge operation
             merge_data = st.button("Merge Data")
 
-            if merge_data and 'fuzzy_matched_data' in st.session_state and not st.session_state.fuzzy_matched_data.empty:
-                # Load ATC description files if uploaded
-                atc_one = safe_load_csv(atc_one_file) if atc_one_file else None
-                atc_two = safe_load_csv(atc_two_file) if atc_two_file else None
-                atc_three = safe_load_csv(atc_three_file) if atc_three_file else None
-                atc_four = safe_load_csv(atc_four_file) if atc_four_file else None
-              
-                # Retrieve the fuzzy_matched_data from session state
-                st.session_state.fuzzy_matched_data =  st.session_state.atc_level_data
+            if merge_data:
+                if 'fuzzy_matched_data' in st.session_state and not st.session_state.fuzzy_matched_data.empty:
+                    # Assume atc_one_file, atc_two_file, atc_three_file, atc_four_file are defined elsewhere
+                    # Load ATC description files if uploaded
+                    atc_one = safe_load_csv(atc_one_file) if atc_one_file else None
+                    atc_two = safe_load_csv(atc_two_file) if atc_two_file else None
+                    atc_three = safe_load_csv(atc_three_file) if atc_three_file else None
+                    atc_four = safe_load_csv(atc_four_file) if atc_four_file else None
 
-                # Merge with ATC level descriptions
-                with st.spinner('Merging data with ATC level descriptions...'):
-                    if atc_one is not None and 'ATCLevelOneCode' in st.session_state.fuzzy_matched_data.columns:
-                        st.session_state.fuzzy_matched_data = st.session_state.fuzzy_matched_data.merge(atc_one, on='ATCLevelOneCode', how='left')
-                    if atc_two is not None and 'ATCLevelTwoCode' in st.session_state.fuzzy_matched_data.columns:
-                        st.session_state.fuzzy_matched_data = st.session_state.fuzzy_matched_data.merge(atc_two, on='ATCLevelTwoCode', how='left')
-                    if atc_three is not None and 'ATCLevelThreeCode' in st.session_state.fuzzy_matched_data.columns:
-                        st.session_state.fuzzy_matched_data = st.session_state.fuzzy_matched_data.merge(atc_three, on='ATCLevelThreeCode', how='left')
-                    if atc_four is not None and 'ATCLevelFourCode' in st.session_state.fuzzy_matched_data.columns:
-                        st.session_state.fuzzy_matched_data = st.session_state.fuzzy_matched_data.merge(atc_four, on='ATCLevelFourCode', how='left')
+                    # Note: The previous line that sets fuzzy_matched_data to atc_level_data seems incorrect and was removed.
+                    # Merge with ATC level descriptions
+                    with st.spinner('Merging data with ATC level descriptions...'):
+                        merged_data = st.session_state.fuzzy_matched_data.copy()  # Work on a copy to prevent modifying the original data prematurely
+                        if atc_one is not None and 'ATCLevelOneCode' in merged_data.columns:
+                            merged_data = merged_data.merge(atc_one, on='ATCLevelOneCode', how='left')
+                        if atc_two is not None and 'ATCLevelTwoCode' in merged_data.columns:
+                            merged_data = merged_data.merge(atc_two, on='ATCLevelTwoCode', how='left')
+                        if atc_three is not None and 'ATCLevelThreeCode' in merged_data.columns:
+                            merged_data = merged_data.merge(atc_three, on='ATCLevelThreeCode', how='left')
+                        if atc_four is not None and 'ATCLevelFourCode' in merged_data.columns:
+                            merged_data = merged_data.merge(atc_four, on='ATCLevelFourCode', how='left')
 
-                # Correctly update the session state with the merged data
-                st.session_state['fda_with_ATCCodeDescription'] = st.session_state.fuzzy_matched_data
-                st.success("Data merged with ATC level descriptions.")
-                
-                # Display the merged dataframe
-                if not st.session_state.fuzzy_matched_data.empty:
-                    st.write("Merged Data:")
-                    st.dataframe(st.session_state.fuzzy_matched_data)
+                        # Save the merged data in session state under a new key
+                        st.session_state['fda_with_ATCCodeDescription'] = merged_data
+                        st.success("Data merged with ATC level descriptions.")
+
+                        # Display the merged dataframe
+                        if not merged_data.empty:
+                            st.write("Merged Data:")
+                            st.dataframe(merged_data)
+                        else:
+                            st.write("No data to display after merging.")
                 else:
-                    st.write("No data to display after merging.")
+                    st.warning("Please complete the fuzzy matching process and ensure ATC level description files are uploaded.")
 
-           
-            else:
-                st.warning("Please complete the fuzzy matching process and ensure ATC level description files are uploaded and merged.")
-            
             # Download file
             csv = convert_df_to_csv(st.session_state.fuzzy_matched_data)
             if csv is not None:
@@ -1573,36 +1572,46 @@ def display_main_application_content():
                 # Handle the case where 'csv' is None, e.g., display a message or take alternative action
                 print("No data available to convert to CSV")
 
-            # Filters
-            filter_options = ["None", "ATCLevelOneDescript", "ATCLevelTwoDescript", "ATCLevelThreeDescript", "Chemical Subgroup", "Generic Name"]
+            # Filter options presented to the user
+            filter_options = ["None", "ATCLevelOneDescript", "ATCLevelTwoDescript", "ATCLevelThreeDescript", "Chemical Subgroup", "Ingredient"]
             selected_filter = st.radio("Select a filter", filter_options)
 
-            # Initialize an empty DataFrame for filtered_data to handle its scope outside the if condition
-            filtered_data = pd.DataFrame()
+            # Check if 'fda_with_ATCCodeDescription' is in session state and is not empty
+            if 'fda_with_ATCCodeDescription' in st.session_state and not st.session_state['fda_with_ATCCodeDescription'].empty:
+                # Condition to handle filtering
+                if selected_filter != "None":
+                    # Convert all values in the selected filter column to string, get unique values, and sort
+                    filter_values = sorted(st.session_state['fda_with_ATCCodeDescription'][selected_filter].astype(str).unique())
+                    selected_values = st.multiselect(f"Select {selected_filter}", filter_values)
 
-            if selected_filter != "None" and not st.session_state.get('fda_with_ATCCodeDescription', pd.DataFrame()).empty:
-                # Convert all values to string and sort
-                filter_values = sorted(st.session_state['fda_with_ATCCodeDescription'][selected_filter].astype(str).unique())
-                selected_values = st.multiselect(f"Select {selected_filter}", filter_values)
+                    # Initialize filtered_data with the full dataset to handle scope
+                    filtered_data = st.session_state['fda_with_ATCCodeDescription'].copy()
 
-                if selected_values:
-                    # Filter the dataframe only if the selection is not empty
-                    filtered_data = st.session_state['fda_with_ATCCodeDescription'][
-                        st.session_state['fda_with_ATCCodeDescription'][selected_filter].astype(str).isin(selected_values)
-                    ]
-                    st.write(f"Filtered Data by {selected_filter}:")
+                    if selected_values:
+                        # Apply filter based on selected values
+                        filtered_data = filtered_data[filtered_data[selected_filter].astype(str).isin(selected_values)]
+                        st.write(f"Filtered Data by {selected_filter}:")
+                    else:
+                        st.write("Displaying unfiltered data (no specific filter values selected):")
+
+                    # Display filtered data and count
                     st.dataframe(filtered_data)
                     st.write(f"Filtered data count: {len(filtered_data)}")
-                else:
-                    st.write("No filter applied.")
 
-            # Check if there is filtered data to download
-            if not filtered_data.empty:
-                csv = convert_df_to_csv(filtered_data)
-                st.download_button(label="Download FDA Register as CSV", data=csv, file_name='fda_register_filtered.csv', mime='text/csv', key='download_fda_register_filtered')
+                    # Offer CSV download for filtered data
+                    csv = convert_df_to_csv(filtered_data)
+                    st.download_button(label="Download Filtered Data as CSV", data=csv, file_name='fda_register_filtered.csv', mime='text/csv', key='download_filtered')
+                else:
+                    st.write("No filter selected. Displaying unfiltered data:")
+                    st.dataframe(st.session_state['fda_with_ATCCodeDescription'])
+                    st.write(f"Total data count: {len(st.session_state['fda_with_ATCCodeDescription'])}")
+
+                    # Optionally, offer download of unfiltered data
+                    csv = convert_df_to_csv(st.session_state['fda_with_ATCCodeDescription'])
+                    st.download_button(label="Download Unfiltered Data as CSV", data=csv, file_name='fda_register_unfiltered.csv', mime='text/csv', key='download_unfiltered')
             else:
-                # This else block could be optional based on whether you want to display a message when there's no data to download
-                st.write("No data available to download.")
+                # Handle case where the data isn't available or hasn't been loaded
+                st.write("Data not available. Please ensure data is loaded and processed.")
                
 
         # Patient Flow Forecasting
