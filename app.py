@@ -387,17 +387,8 @@ def check_required_columns(df, required_columns, level):
     else:
         st.warning(f"No file uploaded for ATC Level {level}.")
         st.session_state['check_passed'] = False
-    
-# def check_required_columns(dataframe, required_columns, atc_level):
-#     if dataframe is not None:
-#         missing_columns = [column for column in required_columns if column not in dataframe.columns]
-#         if not missing_columns:
-#             st.success(f"All required columns for ATC Level {atc_level} are present.")
-#         else:
-#             st.error(f"Missing required columns for ATC Level {atc_level}: {', '.join(missing_columns)}")
-#     else:
-#         st.warning(f"No file uploaded for ATC Level {atc_level}.")
-        
+
+      
 # Function to check for required columns in the uploaded file
 def check_required_columns_in_file(file, required_columns):
     if file is not None:
@@ -782,7 +773,7 @@ def display_main_application_content():
                         st.error("Cannot merge data. Please ensure all required columns are present and try again.")
                 else:
                     st.warning("Please complete the fuzzy matching process and ensure ATC level description files are uploaded.")
-
+           
             # Download file
             csv = convert_df_to_csv(mcaz_register)
             if csv is not None:
@@ -792,37 +783,47 @@ def display_main_application_content():
             else:
                 # Handle the case where 'csv' is None, e.g., display a message or take alternative action
                 print("No data available to convert to CSV")
-
-            # Filters
+                
+            # Filter options presented to the user
             filter_options = ["None", "ATCLevelOneDescript", "ATCLevelTwoDescript", "ATCLevelThreeDescript", "Chemical Subgroup", "Generic Name"]
             selected_filter = st.radio("Select a filter", filter_options)
 
-            # Initialize an empty DataFrame for filtered_data to handle its scope outside the if condition
-            filtered_data = pd.DataFrame()
+            # Check if 'fda_with_ATCCodeDescription' is in session state and is not empty
+            if 'mcaz_with_ATCCodeDescription' in st.session_state and not st.session_state['mcaz_with_ATCCodeDescription'].empty:
+                # Condition to handle filtering
+                if selected_filter != "None":
+                    # Convert all values in the selected filter column to string, get unique values, and sort
+                    filter_values = sorted(st.session_state['mcaz_with_ATCCodeDescription'][selected_filter].astype(str).unique())
+                    selected_values = st.multiselect(f"Select {selected_filter}", filter_values)
 
-            if selected_filter != "None" and not st.session_state.get('mcaz_with_ATCCodeDescription', pd.DataFrame()).empty:
-                # Convert all values to string and sort
-                filter_values = sorted(st.session_state['mcaz_with_ATCCodeDescription'][selected_filter].astype(str).unique())
-                selected_values = st.multiselect(f"Select {selected_filter}", filter_values)
+                    # Initialize filtered_data with the full dataset to handle scope
+                    filtered_data = st.session_state['mcaz_with_ATCCodeDescription'].copy()
 
-                if selected_values:
-                    # Filter the dataframe only if the selection is not empty
-                    filtered_data = st.session_state['mcaz_with_ATCCodeDescription'][
-                        st.session_state['mcaz_with_ATCCodeDescription'][selected_filter].astype(str).isin(selected_values)
-                    ]
-                    st.write(f"Filtered Data by {selected_filter}:")
+                    if selected_values:
+                        # Apply filter based on selected values
+                        filtered_data = filtered_data[filtered_data[selected_filter].astype(str).isin(selected_values)]
+                        st.write(f"Filtered Data by {selected_filter}:")
+                    else:
+                        st.write("Displaying unfiltered data (no specific filter values selected):")
+
+                    # Display filtered data and count
                     st.dataframe(filtered_data)
                     st.write(f"Filtered data count: {len(filtered_data)}")
-                else:
-                    st.write("No filter applied.")
 
-            # Check if there is filtered data to download
-            if not filtered_data.empty:
-                csv = convert_df_to_csv(filtered_data)
-                st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_filtered.csv', mime='text/csv', key='download_mcaz_register_filtered')
+                    # Offer CSV download for filtered data
+                    csv = convert_df_to_csv(filtered_data)
+                    st.download_button(label="Download Filtered Data as CSV", data=csv, file_name='mcaz_register_filtered.csv', mime='text/csv', key='download_filtered')
+                else:
+                    st.write("No filter selected. Displaying unfiltered data:")
+                    st.dataframe(st.session_state['mcaz_with_ATCCodeDescription'])
+                    st.write(f"Total data count: {len(st.session_state['mcaz_with_ATCCodeDescription'])}")
+
+                    # Optionally, offer download of unfiltered data
+                    csv = convert_df_to_csv(st.session_state['mcaz_with_ATCCodeDescription'])
+                    st.download_button(label="Download Unfiltered Data as CSV", data=csv, file_name='mcaz_register_unfiltered.csv', mime='text/csv', key='download_unfiltered')
             else:
-                # This else block could be optional based on whether you want to display a message when there's no data to download
-                st.write("No data available to download.")
+                # Handle case where the data isn't available or hasn't been loaded
+                st.write("Data not available. Please ensure data is loaded and processed.")
                
             # Streamlit UI layout for Data Filtering Based on User Type and Selected Filter
             st.subheader("Data Filtering Based on User Type and Selected Filter")
