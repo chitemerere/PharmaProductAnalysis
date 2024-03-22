@@ -1753,7 +1753,7 @@ def display_main_application_content():
 
                     if selected_applicant_3 != "None":
                         # Filter data based on selected principal
-                        filtered_data = fda_register[fda_register['Applicant'] == selected_appllicant_3]
+                        filtered_data = fda_register[fda_register['Applicant'] == selected_applicant_3]
                     else:
                         # If "None" is selected, use the entire dataset
                         filtered_data = fda_register
