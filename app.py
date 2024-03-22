@@ -787,38 +787,48 @@ def display_main_application_content():
             else:
                 # Handle the case where 'csv' is None, e.g., display a message or take alternative action
                 print("No data available to convert to CSV")
-
-            # Filters
+                
+            # Filter options presented to the user
             filter_options = ["None", "ATCLevelOneDescript", "ATCLevelTwoDescript", "ATCLevelThreeDescript", "Chemical Subgroup", "Generic Name"]
             selected_filter = st.radio("Select a filter", filter_options)
 
-            # Initialize an empty DataFrame for filtered_data to handle its scope outside the if condition
-            filtered_data = pd.DataFrame()
+            # Check if 'fda_with_ATCCodeDescription' is in session state and is not empty
+            if 'mcaz_with_ATCCodeDescription' in st.session_state and not st.session_state['mcaz_with_ATCCodeDescription'].empty:
+                # Condition to handle filtering
+                if selected_filter != "None":
+                    # Convert all values in the selected filter column to string, get unique values, and sort
+                    filter_values = sorted(st.session_state['mcaz_with_ATCCodeDescription'][selected_filter].astype(str).unique())
+                    selected_values = st.multiselect(f"Select {selected_filter}", filter_values)
 
-            if selected_filter != "None" and not st.session_state.get('mcaz_with_ATCCodeDescription', pd.DataFrame()).empty:
-                # Convert all values to string and sort
-                filter_values = sorted(st.session_state['mcaz_with_ATCCodeDescription'][selected_filter].astype(str).unique())
-                selected_values = st.multiselect(f"Select {selected_filter}", filter_values)
+                    # Initialize filtered_data with the full dataset to handle scope
+                    filtered_data = st.session_state['mcaz_with_ATCCodeDescription'].copy()
 
-                if selected_values:
-                    # Filter the dataframe only if the selection is not empty
-                    filtered_data = st.session_state['mcaz_with_ATCCodeDescription'][
-                        st.session_state['mcaz_with_ATCCodeDescription'][selected_filter].astype(str).isin(selected_values)
-                    ]
-                    st.write(f"Filtered Data by {selected_filter}:")
+                    if selected_values:
+                        # Apply filter based on selected values
+                        filtered_data = filtered_data[filtered_data[selected_filter].astype(str).isin(selected_values)]
+                        st.write(f"Filtered Data by {selected_filter}:")
+                    else:
+                        st.write("Displaying unfiltered data (no specific filter values selected):")
+
+                    # Display filtered data and count
                     st.dataframe(filtered_data)
                     st.write(f"Filtered data count: {len(filtered_data)}")
-                else:
-                    st.write("No filter applied.")
 
-            # Check if there is filtered data to download
-            if not filtered_data.empty:
-                csv = convert_df_to_csv(filtered_data)
-                st.download_button(label="Download MCAZ Register as CSV", data=csv, file_name='mcaz_register_filtered.csv', mime='text/csv', key='download_mcaz_register_filtered')
+                    # Offer CSV download for filtered data
+                    csv = convert_df_to_csv(filtered_data)
+                    st.download_button(label="Download Filtered Data as CSV", data=csv, file_name='mcaz_register_filtered.csv', mime='text/csv', key='download_filtered')
+                else:
+                    st.write("No filter selected. Displaying unfiltered data:")
+                    st.dataframe(st.session_state['mcaz_with_ATCCodeDescription'])
+                    st.write(f"Total data count: {len(st.session_state['mcaz_with_ATCCodeDescription'])}")
+
+                    # Optionally, offer download of unfiltered data
+                    csv = convert_df_to_csv(st.session_state['mcaz_with_ATCCodeDescription'])
+                    st.download_button(label="Download Unfiltered Data as CSV", data=csv, file_name='mcaz_register_unfiltered.csv', mime='text/csv', key='download_unfiltered')
             else:
-                # This else block could be optional based on whether you want to display a message when there's no data to download
-                st.write("No data available to download.")
-               
+                # Handle case where the data isn't available or hasn't been loaded
+                st.write("Data not available. Please ensure data is loaded and processed.")
+           
             # Streamlit UI layout for Data Filtering Based on User Type and Selected Filter
             st.subheader("Data Filtering Based on User Type and Selected Filter")
 
@@ -1736,7 +1746,7 @@ def display_main_application_content():
 
                     # Add "None" option and select Principal Name
                     applicant_options = ['None'] + sorted(fda_register['Applicant'].unique())
-                    selected_applicant_3 = st.selectbox("Select Principal Name", applicant_options, key = "applicant_selection_3")
+                    selected_applicant_3 = st.selectbox("Select Applicant Name", applicant_options, key = "applicant_selection_3")
                     
                     # Choose sort order
                     sort_order_3 = st.radio("Select Sort Order", ["Ascending", "Descending"], key = "sort_order_selection_3")
