@@ -482,6 +482,15 @@ def construct_wipo_link(patent_no):
     # Return the HTML anchor tag for the link
     return f'<a href="{link}" target="_blank">{patent_no}</a>'
 
+# Function to check if required columns are present in the dataframe
+def check_required_columns_orangebook(df, required_columns):
+    if df is None:
+        return False, ["DataFrame is None"]
+    missing_columns = [column for column in required_columns if column not in df.columns]
+    if missing_columns:
+        return False, missing_columns
+    return True, None
+
 
 def display_main_application_content():
                         
@@ -1341,12 +1350,43 @@ def display_main_application_content():
                 patent_file = st.file_uploader("Upload the patent.csv file", type=['csv'], key="patent_uploader")
                 exclusivity_file = st.file_uploader("Upload the exclusivity.csv file", type=['csv'], key="exclusivity_uploader")
 
-                if products_file and patent_file and exclusivity_file:
-                    # Load the dataframes and store them in the session state
-                    st.session_state.products_df = load_data_orange(products_file)
-                    st.session_state.patent_df = load_data_orange(patent_file)
-                    st.session_state.exclusivity_df = load_data_orange(exclusivity_file)
+                # Initialize dataframes to None
+                products_df = None
+                patent_df = None
+                exclusivity_df = None
 
+                # Inside the FDA Orange Book Analysis section
+                if products_file and patent_file and exclusivity_file:
+                    # Load the dataframes
+                    products_df = load_data_orange(products_file)
+                    patent_df = load_data_orange(patent_file)
+                    exclusivity_df = load_data_orange(exclusivity_file)
+                    
+                # Check for required columns in each dataframe
+                products_columns_required = ['Ingredient', 'DF;Route', 'Trade_Name', 'Applicant', 'Strength']
+                patent_columns_required = ['Appl_Type', 'Appl_No', 'Product_No', 'Patent_No', 'Patent_Expire_Date_Text', 'Drug_Substance_Flag', 'Drug_Product_Flag', 'Patent_Use_Code', 'Delist_Flag', 'Submission_Date']
+                exclusivity_columns_required = ['Appl_Type', 'Appl_No', 'Product_No', 'Exclusivity_Code', 'Exclusivity_Date']
+                
+                products_check, products_missing = check_required_columns_orangebook(products_df, products_columns_required)
+                patent_check, patent_missing = check_required_columns_orangebook(patent_df, patent_columns_required)
+                exclusivity_check, exclusivity_missing = check_required_columns_orangebook(exclusivity_df, exclusivity_columns_required)
+                
+                # If any required columns are missing, display a message and return
+                if not products_check:
+                    st.error(f"Missing columns in products file: {', '.join(products_missing)}. Please upload a correct file.")
+                    return
+                if not patent_check:
+                    st.error(f"Missing columns in patent file: {', '.join(patent_missing)}. Please upload a correct file.")
+                    return
+                if not exclusivity_check:
+                    st.error(f"Missing columns in exclusivity file: {', '.join(exclusivity_missing)}. Please upload a correct file.")
+                    return
+
+                # If all checks pass, store the dataframes in the session state
+                st.session_state.products_df = products_df
+                st.session_state.patent_df = patent_df
+                st.session_state.exclusivity_df = exclusivity_df
+            
             # If the dataframes are in the session state, proceed with the analysis
             if 'products_df' in st.session_state and 'patent_df' in st.session_state and 'exclusivity_df' in st.session_state:
                 # Perform the analysis using the dataframes from the session state
