@@ -491,7 +491,6 @@ def check_required_columns_orangebook(df, required_columns):
         return False, missing_columns
     return True, None
 
-
 def display_main_application_content():
                         
     # Initialize mcaz_register as an empty DataFrame at the start
@@ -511,83 +510,100 @@ def display_main_application_content():
     uploaded_file = st.sidebar.file_uploader("Upload your MCAZ Register CSV file", type=["csv"])
 
     if uploaded_file is not None:
+        # Load the data once and use it throughout
         data = load_data(uploaded_file)
+        # Normalize column names immediately after loading
+        data.columns = [str(col).strip() for col in data.columns]
 
         # Data Overview
         if choice == 'Data Overview':
-            # ... code for 'Data Overview'
             st.subheader('Data Overview')
-            # Load the data using the existing function
-            data = load_data(uploaded_file)
-            mcaz_register = load_data(uploaded_file)
+
+            # Use the loaded and normalized 'data' directly
+            mcaz_register = data.copy()
             st.session_state['mcaz_register'] = mcaz_register
-            
+
+            # Required columns
+            required_columns_overview = [
+                "Trade Name", "Generic Name", "Registration No", "Date Registered",
+                "Expiry Date", "Form", "Categories for Distribution", "Strength",
+                "Manufacturers", "Applicant Name", "Principal Name"
+            ]
+
+            # Check if all required columns exist in the data
+            missing_columns = [col for col in required_columns_overview if col not in data.columns]
+            if missing_columns:
+                st.error(f"The following required columns are missing from the uploaded data: {', '.join(missing_columns)}")
+                # Use a conditional block to stop further processing
+            else:
+            # Proceed with processing that depends on the presence of required columns
+          
             # Manufacturer Filter
             # Check if 'Manufacturers' column exists in the data
-            if 'Manufacturers' in data.columns:
-                manufacturer_options = ['All Manufacturers'] + sorted(data['Manufacturers'].dropna().unique().tolist())
-                selected_manufacturer = st.selectbox('Select Manufacturer', manufacturer_options, index=0)
-            else:
-                st.error("The 'Manufacturers' column is missing from the uploaded data.")
+                if 'Manufacturers' in data.columns:
+                    manufacturer_options = ['All Manufacturers'] + sorted(data['Manufacturers'].dropna().unique().tolist())
+                    selected_manufacturer = st.selectbox('Select Manufacturer', manufacturer_options, index=0)
+                else:
+                    st.error("The 'Manufacturers' column is missing from the uploaded data.")
 
-            data.columns = [str(col).strip() for col in data.columns]
-            product_options = ['All Products'] + sorted(data['Generic Name'].dropna().unique().tolist())
-            selected_product = st.selectbox('Select Generic Name', product_options, index=0)
+                data.columns = [str(col).strip() for col in data.columns]
+                product_options = ['All Products'] + sorted(data['Generic Name'].dropna().unique().tolist())
+                selected_product = st.selectbox('Select Generic Name', product_options, index=0)
 
-            # Form Filter
-            form_options = ['All Forms'] + sorted(data['Form'].dropna().unique().tolist())
-            selected_form = st.selectbox('Select Form', form_options, index=0)
+                # Form Filter
+                form_options = ['All Forms'] + sorted(data['Form'].dropna().unique().tolist())
+                selected_form = st.selectbox('Select Form', form_options, index=0)
 
-            # Principal Filter
-            principal_options = ['All Principal'] + sorted(data['Principal Name'].dropna().unique().tolist())
-            selected_principal = st.selectbox('Select Principal Name', principal_options, index=0)
+                # Principal Filter
+                principal_options = ['All Principal'] + sorted(data['Principal Name'].dropna().unique().tolist())
+                selected_principal = st.selectbox('Select Principal Name', principal_options, index=0)
 
-            # Categories of Distribution Filter
-            category_options = ['All Categories of Distribution'] + sorted(data['Categories for Distribution'].dropna().unique().tolist())
-            selected_category = st.selectbox('Select Category of Distribution', category_options, index=0)
+                # Categories of Distribution Filter
+                category_options = ['All Categories of Distribution'] + sorted(data['Categories for Distribution'].dropna().unique().tolist())
+                selected_category = st.selectbox('Select Category of Distribution', category_options, index=0)
 
-            # Applicant Filter
-            applicant_options = ['All Applicants'] + sorted(data['Applicant Name'].dropna().unique().tolist())
-            selected_applicant = st.selectbox('Select Applicant Name', applicant_options, index=0)
+                # Applicant Filter
+                applicant_options = ['All Applicants'] + sorted(data['Applicant Name'].dropna().unique().tolist())
+                selected_applicant = st.selectbox('Select Applicant Name', applicant_options, index=0)
 
-            # Sort Order Filter for Generic Name
-            sort_order_generic_options = ['Ascending', 'Descending']
-            selected_sort_order_generic = st.selectbox('Sort by Generic Name', sort_order_generic_options)
+                # Sort Order Filter for Generic Name
+                sort_order_generic_options = ['Ascending', 'Descending']
+                selected_sort_order_generic = st.selectbox('Sort by Generic Name', sort_order_generic_options)
 
-            # Sort Order Filter for Strength
-            sort_order_strength_options = ['Ascending', 'Descending']
-            selected_sort_order_strength = st.selectbox('Sort by Strength', sort_order_strength_options)
+                # Sort Order Filter for Strength
+                sort_order_strength_options = ['Ascending', 'Descending']
+                selected_sort_order_strength = st.selectbox('Sort by Strength', sort_order_strength_options)
 
 
-            # Filtering the data based on selections
-            filtered_data = data
-            if selected_manufacturer != 'All Manufacturers':
-                filtered_data = filtered_data[filtered_data['Manufacturers'] == selected_manufacturer]
-            if selected_product != 'All Products':
-                filtered_data = filtered_data[filtered_data['Generic Name'] == selected_product]
-            if selected_form != 'All Forms':
-                filtered_data = filtered_data[filtered_data['Form'] == selected_form]
-            if selected_principal != 'All Principal':
-                filtered_data = filtered_data[filtered_data['Principal Name'] == selected_principal]
-            if selected_category != 'All Categories of Distribution':
-                filtered_data = filtered_data[filtered_data['Categories for Distribution'] == selected_category]
-            if selected_applicant != 'All Applicants':
-                filtered_data = filtered_data[filtered_data['Applicant Name'] == selected_applicant]
+                # Filtering the data based on selections
+                filtered_data = data
+                if selected_manufacturer != 'All Manufacturers':
+                    filtered_data = filtered_data[filtered_data['Manufacturers'] == selected_manufacturer]
+                if selected_product != 'All Products':
+                    filtered_data = filtered_data[filtered_data['Generic Name'] == selected_product]
+                if selected_form != 'All Forms':
+                    filtered_data = filtered_data[filtered_data['Form'] == selected_form]
+                if selected_principal != 'All Principal':
+                    filtered_data = filtered_data[filtered_data['Principal Name'] == selected_principal]
+                if selected_category != 'All Categories of Distribution':
+                    filtered_data = filtered_data[filtered_data['Categories for Distribution'] == selected_category]
+                if selected_applicant != 'All Applicants':
+                    filtered_data = filtered_data[filtered_data['Applicant Name'] == selected_applicant]
 
-            # Apply sort order for Generic Name and then Strength
-            if selected_sort_order_generic == 'Descending':
-                filtered_data = filtered_data.sort_values(by=['Generic Name', 'Strength'], ascending=[False, selected_sort_order_strength == 'Ascending'])
-            else:
-                filtered_data = filtered_data.sort_values(by=['Generic Name', 'Strength'], ascending=[True, selected_sort_order_strength == 'Ascending'])
+                # Apply sort order for Generic Name and then Strength
+                if selected_sort_order_generic == 'Descending':
+                    filtered_data = filtered_data.sort_values(by=['Generic Name', 'Strength'], ascending=[False, selected_sort_order_strength == 'Ascending'])
+                else:
+                    filtered_data = filtered_data.sort_values(by=['Generic Name', 'Strength'], ascending=[True, selected_sort_order_strength == 'Ascending'])
 
-            # Display the filtered dataframe
-            st.write("Filtered Data:")
-            st.dataframe(filtered_data)
-            st.write(f"Filtered data count: {len(filtered_data)}")
+                # Display the filtered dataframe
+                st.write("Filtered Data:")
+                st.dataframe(filtered_data)
+                st.write(f"Filtered data count: {len(filtered_data)}")
 
-            # Download Dataframe
-            csv = convert_df_to_csv(filtered_data)
-            st.download_button(label="Download Filtered Data as CSV", data=csv, file_name='filtered_data.csv', mime='text/csv')
+                # Download Dataframe
+                csv = convert_df_to_csv(filtered_data)
+                st.download_button(label="Download Filtered Data as CSV", data=csv, file_name='filtered_data.csv', mime='text/csv')
             
             # Start of the Streamlit UI layout
             st.subheader("Data Processing with Fuzzy Matching and ATC Code Extraction")
