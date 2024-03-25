@@ -1350,42 +1350,51 @@ def display_main_application_content():
                 patent_file = st.file_uploader("Upload the patent.csv file", type=['csv'], key="patent_uploader")
                 exclusivity_file = st.file_uploader("Upload the exclusivity.csv file", type=['csv'], key="exclusivity_uploader")
 
-                # Initialize dataframes to None
-                products_df = None
-                patent_df = None
-                exclusivity_df = None
 
-                # Inside the FDA Orange Book Analysis section
-                if products_file and patent_file and exclusivity_file:
-                    # Load the dataframes
-                    products_df = load_data_orange(products_file)
-                    patent_df = load_data_orange(patent_file)
-                    exclusivity_df = load_data_orange(exclusivity_file)
-                    
                 # Check for required columns in each dataframe
                 products_columns_required = ['Ingredient', 'DF;Route', 'Trade_Name', 'Applicant', 'Strength']
                 patent_columns_required = ['Appl_Type', 'Appl_No', 'Product_No', 'Patent_No', 'Patent_Expire_Date_Text', 'Drug_Substance_Flag', 'Drug_Product_Flag', 'Patent_Use_Code', 'Delist_Flag', 'Submission_Date']
                 exclusivity_columns_required = ['Appl_Type', 'Appl_No', 'Product_No', 'Exclusivity_Code', 'Exclusivity_Date']
                 
-                products_check, products_missing = check_required_columns_orangebook(products_df, products_columns_required)
-                patent_check, patent_missing = check_required_columns_orangebook(patent_df, patent_columns_required)
-                exclusivity_check, exclusivity_missing = check_required_columns_orangebook(exclusivity_df, exclusivity_columns_required)
-                
-                # If any required columns are missing, display a message and return
-                if not products_check:
-                    st.error(f"Missing columns in products file: {', '.join(products_missing)}. Please upload a correct file.")
-                    return
-                if not patent_check:
-                    st.error(f"Missing columns in patent file: {', '.join(patent_missing)}. Please upload a correct file.")
-                    return
-                if not exclusivity_check:
-                    st.error(f"Missing columns in exclusivity file: {', '.join(exclusivity_missing)}. Please upload a correct file.")
-                    return
+                # Initialize a flag to indicate all required files are uploaded
+                all_files_uploaded = True
 
-                # If all checks pass, store the dataframes in the session state
-                st.session_state.products_df = products_df
-                st.session_state.patent_df = patent_df
-                st.session_state.exclusivity_df = exclusivity_df
+                # Attempt to load the products file
+                if products_file:
+                    products_df = load_data_orange(products_file)
+                    products_check, products_missing = check_required_columns_orangebook(products_df, products_columns_required) if products_df is not None else (False, ["DataFrame is None"])
+                    if not products_check:
+                        st.error(f"Missing columns in products file: {', '.join(products_missing)}. Please upload a correct file.")
+                else:
+                    st.error("Products file is not uploaded.")
+                    all_files_uploaded = False
+
+                # Attempt to load the patent file
+                if patent_file:
+                    patent_df = load_data_orange(patent_file)
+                    patent_check, patent_missing = check_required_columns_orangebook(patent_df, patent_columns_required) if patent_df is not None else (False, ["DataFrame is None"])
+                    if not patent_check:
+                        st.error(f"Missing columns in patent file: {', '.join(patent_missing)}. Please upload a correct file.")
+                else:
+                    st.error("Patent file is not uploaded.")
+                    all_files_uploaded = False
+
+                # Attempt to load the exclusivity file
+                if exclusivity_file:
+                    exclusivity_df = load_data_orange(exclusivity_file)
+                    exclusivity_check, exclusivity_missing = check_required_columns_orangebook(exclusivity_df, exclusivity_columns_required) if exclusivity_df is not None else (False, ["DataFrame is None"])
+                    if not exclusivity_check:
+                        st.error(f"Missing columns in exclusivity file: {', '.join(exclusivity_missing)}. Please upload a correct file.")
+                else:
+                    st.error("Exclusivity file is not uploaded.")
+                    all_files_uploaded = False
+
+                # Only proceed if all files are correctly uploaded and loaded
+                if all_files_uploaded:
+                    # Store the dataframes in the session state or proceed with further processing
+                    st.session_state.products_df = products_df if 'products_df' in locals() else None
+                    st.session_state.patent_df = patent_df if 'patent_df' in locals() else None
+                    st.session_state.exclusivity_df = exclusivity_df if 'exclusivity_df' in locals() else None
             
             # If the dataframes are in the session state, proceed with the analysis
             if 'products_df' in st.session_state and 'patent_df' in st.session_state and 'exclusivity_df' in st.session_state:
