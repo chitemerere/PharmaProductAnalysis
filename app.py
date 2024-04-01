@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[1]:
 
 
 import streamlit as st
@@ -16,6 +16,7 @@ from fuzzywuzzy import fuzz
 from datetime import datetime 
 import os
 import toml
+import chardet
 
 # Specify the timezone for Harare
 harare_timezone = ZoneInfo("Africa/Harare")
@@ -491,6 +492,150 @@ def check_required_columns_orangebook(df, required_columns):
         return False, missing_columns
     return True, None
 
+def check_columns(uploaded_file, required_columns):
+    """Check if uploaded file contains all required columns."""
+    try:
+        # Read a small part of the file to determine its encoding
+        rawdata = uploaded_file.read(10000)  # Read the first 10,000 bytes to detect encoding
+        uploaded_file.seek(0)  # Reset file pointer to the beginning
+        result = chardet.detect(rawdata)
+        
+        encoding = result['encoding']
+        if encoding == 'ascii' or not encoding:
+            encoding = 'Windows-1252'  # Fallback to 'Windows-1252' if 'ascii' or detection failed
+        
+        # Attempt to read the file with the detected or fallback encoding
+        try:
+            df = pd.read_csv(uploaded_file, encoding=encoding)
+        except UnicodeDecodeError:
+            uploaded_file.seek(0)  # Reset file pointer and try with 'Windows-1252'
+            df = pd.read_csv(uploaded_file, encoding='Windows-1252')
+        
+        if all(column in df.columns for column in required_columns):
+            return df
+        else:
+            st.error(f"{uploaded_file.name} does not contain all required columns.")
+            return None
+    except Exception as e:
+        st.error(f"Error reading {uploaded_file.name}: {str(e)}")
+        return None
+
+def process_data_Drugs(dataframes):
+    # Join operations
+    products_df = dataframes["Products@FDA.csv"]
+    applications_df = dataframes["Applications.csv"]
+    submissions_df = dataframes["Submissions.csv"]
+    marketing_status_df = dataframes["MarketingStatus.csv"]
+    marketing_status_lookup_df = dataframes["MarketingStatus_Lookup.csv"]
+
+    # Join Products on Applications, Submissions, and MarketingStatus
+    merged_df = products_df.merge(applications_df, on="ApplNo", how="left") \
+                            .merge(submissions_df, on="ApplNo", how="left") \
+                            .merge(marketing_status_df, on=["ApplNo", "ProductNo"], how="left") \
+                            .merge(marketing_status_lookup_df, on="MarketingStatusID", how="left")
+
+    # Drop values where MarketingStatusID is 3 or 5
+    merged_df = merged_df[~merged_df.MarketingStatusID.isin([3, 5])]
+    
+    columns_to_drop = ['ApplPublicNotes', 'SubmissionClassCodeID', 'SubmissionNo', 'SubmissionsPublicNotes', 'MarketingStatusID']
+    columns_to_drop = [col for col in columns_to_drop if col in merged_df.columns]
+
+    # Drop the columns from the dataframe safely
+    merged_df.drop(columns=columns_to_drop, axis=1, inplace=True)
+
+    return merged_df
+
+def perform_drugs_fda_analysis():
+    st.subheader('Drugs@FDA Analysis')
+
+    # Check if the data has already been processed and stored in session state
+    if 'processed_data_Drugs' not in st.session_state:
+        uploaded_files = st.file_uploader(
+            "Upload files",
+            accept_multiple_files=True,
+            help="Upload the files: Products@FDA.csv, Applications.csv, Submissions.csv, MarketingStatus.csv, MarketingStatus_Lookup.csv"
+        )
+
+        if uploaded_files:
+            files = {file.name: file for file in uploaded_files}
+            required_columns = {
+                # Your required columns here
+                "Products@FDA.csv": ["ApplNo", "ProductNo", "Form", "Strength", "ReferenceDrug", "DrugName", "ActiveIngredient", "ReferenceStandard"],
+                "Applications.csv": ["ApplNo", "ApplType", "ApplPublicNotes", "SponsorName"],
+                "Submissions.csv": ["ApplNo", "SubmissionClassCodeID", "SubmissionType", "SubmissionNo", "SubmissionStatus", "SubmissionStatusDate", "SubmissionsPublicNotes", "ReviewPriority"],
+                "MarketingStatus.csv": ["ApplNo", "ProductNo", "MarketingStatusID"],
+                "MarketingStatus_Lookup.csv": ["MarketingStatusID", "MarketingStatusDescription"],            
+            }
+
+            dataframes = {}
+            for filename, required_cols in required_columns.items():
+                if filename in files:
+                    df = check_columns(files[filename], required_cols)
+                    if df is not None:
+                        dataframes[filename] = df
+                else:
+                    st.warning(f"{filename} not uploaded.")
+
+            if len(dataframes) == 5:
+                # Process data and store it in session state
+                st.session_state['processed_data_Drugs'] = process_data_Drugs(dataframes)
+
+    if 'processed_data_Drugs' in st.session_state:
+        merged_df = st.session_state['processed_data_Drugs']
+        # Continue with displaying the processed data or further analysis...
+        # Mutually Exclusive Filters
+        form_options = ['All'] + sorted(merged_df['Form'].unique().tolist())
+        drug_name_options = ['All'] + sorted(merged_df['DrugName'].unique().tolist())
+        active_ingredient_options = ['All'] + sorted(merged_df['ActiveIngredient'].unique().tolist())
+        appl_type_options = ['All'] + sorted(merged_df['ApplType'].astype(str).unique().tolist())
+        sponsor_name_options = ['All'] + sorted(merged_df['SponsorName'].astype(str).unique().tolist())
+        marketing_status_options = ['All'] + sorted(merged_df['MarketingStatusDescription'].astype(str).unique().tolist())
+        submission_type_options = ['All'] + sorted(merged_df['SubmissionType'].astype(str).unique().tolist())
+        review_priority_options = ['All'] + sorted(merged_df['ReviewPriority'].astype(str).unique().tolist())
+        submission_status_options = ['All'] + sorted(merged_df['SubmissionStatus'].astype(str).unique().tolist())
+
+        form_selection = st.selectbox("Form", options=form_options)
+        drug_name_selection = st.selectbox("Drug Name", options=drug_name_options)
+        active_ingredient_selection = st.selectbox("Active Ingredient", options=active_ingredient_options)
+        appl_type_selection = st.selectbox("Application Type", options=appl_type_options)
+        sponsor_name_selection = st.selectbox("Sponsor Name", options=sponsor_name_options)
+        marketing_status_selection = st.selectbox("Marketing Status", options=marketing_status_options)
+        submission_type_selection = st.selectbox("Submission Type", options=submission_type_options)
+        review_priority_selection = st.selectbox("Review Priority", options=review_priority_options)
+        submission_status_selection = st.selectbox("Submission Status", options=submission_status_options)
+
+        # Apply filters
+        if form_selection != 'All':
+            merged_df = merged_df[merged_df['Form'] == form_selection]
+        if drug_name_selection != 'All':
+            merged_df = merged_df[merged_df['DrugName'] == drug_name_selection]
+        if active_ingredient_selection != 'All':
+            merged_df = merged_df[merged_df['ActiveIngredient'] == active_ingredient_selection]
+        if appl_type_selection != 'All':
+            merged_df = merged_df[merged_df['ApplType'] == appl_type_selection]
+        if sponsor_name_selection != 'All':
+            merged_df = merged_df[merged_df['SponsorName'] == sponsor_name_selection]
+        if marketing_status_selection != 'All':
+            merged_df = merged_df[merged_df['MarketingStatusDescription'] == marketing_status_selection]
+        if submission_type_selection != 'All':
+            merged_df = merged_df[merged_df['SubmissionType'] == submission_type_selection]
+        if review_priority_selection != 'All':
+            merged_df = merged_df[merged_df['ReviewPriority'] == review_priority_selection]
+        if submission_status_selection != 'All':
+            merged_df = merged_df[merged_df['SubmissionStatus'] == submission_status_selection]
+        
+        st.dataframe(merged_df)
+        st.write(f"Filtered data count: {len(merged_df)}")
+        # Example: Download button for processed data
+        csv = convert_df_to_csv(merged_df)
+        st.download_button(
+            label="Download processed data as CSV",
+            data=csv,
+            file_name='processed_data_drugs@fda.csv',
+            mime='text/csv',
+        )
+
+
 def display_main_application_content():
                         
     # Initialize mcaz_register as an empty DataFrame at the start
@@ -501,9 +646,9 @@ def display_main_application_content():
 
     # Sidebar for navigation
     menu = ['Data Overview', 'Market Analysis', 'Manufacturer Analysis', 'FDA Orange Book Analysis', 
-            'Applicant Analysis', 'Patient-flow Forecast', 'Drug Classification Analysis', 'Drugs with no Competition', 
-            'Top Pharma Companies Sales', 'FDA Drug Establishment Sites', 'FDA NME & New Biologic Approvals', 
-            'EMA FDA Health Canada Approvals 2023']
+            'Applicant Analysis', 'Drugs@FDA Analysis','Patient-flow Forecast', 'Drug Classification Analysis', 
+            'Drugs with no Competition', 'Top Pharma Companies Sales', 'FDA Drug Establishment Sites', 
+            'FDA NME & New Biologic Approvals', 'EMA FDA Health Canada Approvals 2023']
     choice = st.sidebar.radio("Menu", menu)
     
     # File uploader
@@ -514,7 +659,7 @@ def display_main_application_content():
         data = load_data(uploaded_file)
         # Normalize column names immediately after loading
         data.columns = [str(col).strip() for col in data.columns]
-
+        
         # Data Overview
         if choice == 'Data Overview':
             st.subheader('Data Overview')
@@ -535,11 +680,13 @@ def display_main_application_content():
             if missing_columns:
                 st.error(f"The following required columns are missing from the uploaded data: {', '.join(missing_columns)}")
                 # Use a conditional block to stop further processing
+                # At this point, you've informed the user what's wrong. You can prompt them to re-upload or fix the file.
+                st.info("Please upload a file that includes all the required columns.")
             else:
             # Proceed with processing that depends on the presence of required columns
           
-            # Manufacturer Filter
-            # Check if 'Manufacturers' column exists in the data
+                # Manufacturer Filter
+                # Check if 'Manufacturers' column exists in the data
                 if 'Manufacturers' in data.columns:
                     manufacturer_options = ['All Manufacturers'] + sorted(data['Manufacturers'].dropna().unique().tolist())
                     selected_manufacturer = st.selectbox('Select Manufacturer', manufacturer_options, index=0)
@@ -1923,8 +2070,8 @@ def display_main_application_content():
                     st.write("No data available.")
             else:
                 st.write("ATC Code Description data is not available.")
-
-          
+               
+        
         # Patient Flow Forecasting
         elif choice == 'Patient-flow Forecast':
             st.subheader('Patient-flow Forecast')
@@ -2401,6 +2548,18 @@ def display_main_application_content():
                 mime='text/csv',
             )
        
+        # Assuming 'choice' variable is determined by some user interaction upstream in your code
+        if choice == 'Drugs@FDA Analysis':
+            
+            # Simplified session state management
+            if choice:
+                st.session_state['selected_analysis'] = choice
+
+            # Conditional execution based on session state
+            if 'selected_analysis' in st.session_state:
+                if st.session_state['selected_analysis'] == "Drugs@FDA Analysis":
+                    perform_drugs_fda_analysis()
+              
     else:
         st.warning('Please upload MCAZ Register CSV file.')
 
