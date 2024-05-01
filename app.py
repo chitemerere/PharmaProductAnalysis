@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[1]:
 
 
 import streamlit as st
@@ -430,38 +430,73 @@ def check_prohibited_file_columns(df, required_columns):
         return False, missing_columns
     return True, []
 
-# Helper function to process the uploaded file and generate the "COUNTRY" column
-def process_uploaded_file(uploaded_file):
-    df = pd.read_csv(uploaded_file, encoding='ISO-8859-1')
-    df['COUNTRY_CODE'] = df['ADDRESS'].str.extract(r'\(([^)]+)\)$')
-    columns = [
-        "FIRM_NAME",
-        "ADDRESS",
-        "COUNTRY_CODE",
-        "EXPIRATION_DATE",
-        "OPERATIONS",
-        "ESTABLISHMENT_CONTACT_NAME",
-        "ESTABLISHMENT_CONTACT_EMAIL",
-        "REGISTRANT_NAME",
-        "REGISTRANT_CONTACT_NAME",
-        "REGISTRANT_CONTACT_EMAIL"
-    ]
-    df = df[columns]
-    return df
+required_columns_establishment = [
+    "FIRM_NAME", "ADDRESS", "EXPIRATION_DATE", "OPERATIONS",
+    "ESTABLISHMENT_CONTACT_NAME", "ESTABLISHMENT_CONTACT_EMAIL", "REGISTRANT_NAME",
+    "REGISTRANT_CONTACT_NAME", "REGISTRANT_CONTACT_EMAIL"
+]
 
-# Define the filter_dataframe function with the 'Country' filter instead of 'Country Code'
+required_columns_country = ["Country", "Alpha-2 code", "Alpha-3 code"]
+
+def process_uploaded_file(uploaded_file):
+    try:
+        df = pd.read_csv(uploaded_file, encoding='ISO-8859-1')
+        
+        # Extract COUNTRY_CODE from ADDRESS
+        if 'ADDRESS' in df.columns:
+            df['COUNTRY_CODE'] = df['ADDRESS'].str.extract(r'\(([^)]+)\)$', expand=False)
+            df['COUNTRY_CODE'] = df['COUNTRY_CODE'].fillna('Unknown')
+            columns = [
+                "FIRM_NAME",
+                "ADDRESS",
+                "COUNTRY_CODE",
+                "EXPIRATION_DATE",
+                "OPERATIONS",
+                "ESTABLISHMENT_CONTACT_NAME",
+                "ESTABLISHMENT_CONTACT_EMAIL",
+                "REGISTRANT_NAME",
+                "REGISTRANT_CONTACT_NAME",
+                "REGISTRANT_CONTACT_EMAIL"
+            ]
+            df = df[columns]
+            
+        # Ensure required columns are present, including COUNTRY_CODE
+        if 'COUNTRY_CODE' not in df.columns:
+            df['COUNTRY_CODE'] = 'Unknown'  # Ensuring COUNTRY_CODE is always present
+
+        required_columns_with_country_code = required_columns_establishment + ['COUNTRY_CODE']
+        missing_columns = [col for col in required_columns_with_country_code if col not in df.columns]
+        if missing_columns:
+            st.error(f"Establishment file is missing required columns: {', '.join(missing_columns)}")
+            return None
+
+        return df
+    except Exception as e:
+        st.error(f"An error occurred while processing the file: {e}")
+        return None
+
+def process_country_code_file(uploaded_file):
+    try:
+        df = pd.read_csv(uploaded_file)
+        # Validate required country columns
+        if not all(column in df.columns for column in required_columns_country):
+            st.error('Country code file is missing one or more required columns.')
+            return None
+
+        return df
+    except Exception as e:
+        st.error(f"An error occurred while processing the country code file: {e}")
+        return None
+
 def filter_dataframe_establishments(df, firm_name, country, operations, registrant_name):
     if firm_name != "All":
         df = df[df['FIRM_NAME'] == firm_name]
     if country != "All":
-        df = df[df['Country'] == country]  # Changed to 'Country'
+        df = df[df['Country'] == country]  # Ensure column name is correct
     if operations != "All":
         df = df[df['OPERATIONS'].apply(lambda x: x.strip() == operations)]
-
     if registrant_name != "All":
         df = df[df['REGISTRANT_NAME'] == registrant_name]
-    
-    # Sort the dataframe
     return df.sort_values(by=["FIRM_NAME", "Country", "OPERATIONS", "REGISTRANT_NAME"], ascending=True)
 
 def load_data_nme(uploaded_file):
@@ -2383,46 +2418,59 @@ def display_main_application_content():
                     )
             else:
                 st.write("Please upload a sales data CSV file to get started.")
-        
+                
         # FDA Drug Establishment Sites
         elif choice == 'FDA Drug Establishment Sites':
             st.subheader('FDA Drug Establishment Sites')
             
-            # File uploader for the Establishment file
-            establishment_file = st.file_uploader("Choose an Establishment CSV file", type="csv")
-            # File uploader for the Country Codes file
-            country_codes_file = st.file_uploader("Choose a Country Codes CSV file", type="csv")
-
-            if establishment_file is not None and country_codes_file is not None:
-                # Process the uploaded files
+            # File uploader for the Establishment and Country Codes file
+            establishment_file = st.file_uploader("Choose an Establishment CSV file", type="csv", key="establishment")
+            country_codes_file = st.file_uploader("Choose a Country Codes CSV file", type="csv", key="country_codes")
+            
+            if establishment_file and country_codes_file:
                 df = process_uploaded_file(establishment_file)
-                country_codes_df = pd.read_csv(country_codes_file)
+                if df is None:
+                    st.error("Processing of establishment file failed.")
+                    st.stop()
 
-                # Merge the establishment dataframe with the country codes dataframe
+                country_codes_df = process_country_code_file(country_codes_file)
+                if country_codes_df is None:
+                    st.error("Processing of country codes file failed.")
+                    st.stop()
+
+                # Check if 'COUNTRY_CODE' is available before merge
+                if 'COUNTRY_CODE' not in df.columns:
+                    st.error("Failed to ensure 'COUNTRY_CODE' in DataFrame.")
+                    st.stop()
+
                 merged_df = df.merge(country_codes_df, left_on='COUNTRY_CODE', right_on='Alpha-3 code', how='left')
-
-                # Ensure all values are strings for sorting and filtering
                 merged_df.fillna('Unknown', inplace=True)
+                st.session_state['merged_data'] = merged_df
 
-                # Dropdowns for filtering with sorted options
-                firm_name_options = sorted(merged_df['FIRM_NAME'].unique().tolist())
-                country_options = sorted(merged_df['Country'].unique().tolist())  # Changed to 'Country'
-                operations_options = sorted(merged_df['OPERATIONS'].unique().tolist(), key=lambda x: (x is np.nan, x))
-                registrant_name_options = sorted(merged_df['REGISTRANT_NAME'].unique().tolist())
+            if 'merged_data' in st.session_state:
+                firm_name_options = ["All"] + sorted(st.session_state['merged_data']['FIRM_NAME'].dropna().unique().tolist())
+                country_options = ["All"] + sorted(st.session_state['merged_data']['Country'].dropna().unique().tolist())
+                operations_options = ["All"] + sorted(st.session_state['merged_data']['OPERATIONS'].dropna().unique().tolist())
+                registrant_name_options = ["All"] + sorted(st.session_state['merged_data']['REGISTRANT_NAME'].dropna().unique().tolist())
 
-                firm_name = st.selectbox("Firm Name", ["All"] + firm_name_options)
-                country = st.selectbox("Country", ["All"] + country_options)  # Changed to 'Country'
-                operations = st.selectbox("Operations", ["All"] + operations_options)
-                registrant_name = st.selectbox("Registrant Name", ["All"] + registrant_name_options)
+                firm_name = st.selectbox("Firm Name", firm_name_options)
+                country = st.selectbox("Country", country_options)
+                operations = st.selectbox("Operations", operations_options)
+                registrant_name = st.selectbox("Registrant Name", registrant_name_options)
 
-                # Filter the dataframe based on selection
-                filtered_df = filter_dataframe_establishments(merged_df, firm_name, country, operations, registrant_name)
+                filtered_df = filter_dataframe_establishments(st.session_state['merged_data'], firm_name, country, operations, registrant_name)
+                filtered_df['FIRM_NAME'] = filtered_df['FIRM_NAME'].apply(lambda x: f'<a href="https://www.google.com/search?q={x}" target="_blank">{x}</a>')
+                filtered_df['ESTABLISHMENT_CONTACT_EMAIL'] = filtered_df['ESTABLISHMENT_CONTACT_EMAIL'].apply(lambda x: f'<a href="mailto:{x}">{x}</a>')
+                filtered_df['REGISTRANT_CONTACT_EMAIL'] = filtered_df['REGISTRANT_CONTACT_EMAIL'].apply(lambda x: f'<a href="mailto:{x}">{x}</a>')
 
-                # Save the filtered dataframe in the session state for persistence across modules
-                st.session_state.filtered_data = filtered_df
+                # Implement a simple paginator for the filtered data
+                page_number = st.number_input('Page number', min_value=1, max_value=(len(filtered_df) // 10 + 1), value=1)
+                page_size = 10  # items per page
+                start_index = (page_number - 1) * page_size
+                end_index = start_index + page_size
 
-                st.dataframe(filtered_df)
-                # Count and display the number of drugs
+                # Display filtered data
+                st.write(filtered_df[start_index:end_index].to_html(escape=False, index=False), unsafe_allow_html=True)
                 firm_count = len(filtered_df)
                 st.write(f"Total Number of Unique Firms: {firm_count}")
 
@@ -2434,8 +2482,7 @@ def display_main_application_content():
                     file_name='filtered_fda_sites.csv',
                     mime='text/csv',
                 )
-                
-       
+
         # FDA NME & New Biologic Approvals
         if choice == 'FDA NME & New Biologic Approvals':
             st.subheader('FDA NME & New Biologic Approvals')
@@ -2653,5 +2700,11 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+# In[ ]:
+
+
 
 
