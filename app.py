@@ -2383,7 +2383,7 @@ def display_main_application_content():
                 product_classification = st.selectbox('Product Classification', classification_list)
 
                 # Sorting options
-                sort_column = st.selectbox('Sort by', ['2022 Revenue in Millions USD', '2021 Revenue in Millions USD'], index=0)
+                sort_column = st.selectbox('Sort by', ['2023 Revenue in Millions USD', '2022 Revenue in Millions USD'], index=0)
                 sort_order = st.selectbox('Sort order', ['Ascending', 'Descending'], index=1)
                 is_ascending = sort_order == 'Ascending'
 
