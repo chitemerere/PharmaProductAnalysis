@@ -2254,13 +2254,14 @@ def display_main_application_content():
                             f"Number of Patients taking Long-Acting CCB: {patients_ccb:.2f} thousand",
                             f"Number of Patients taking Combination Therapy: {patients_combo:.2f} thousand"
                         ]
+                        
+            else:
+                st.warning('Please calculate "Drug-treated Patients" in the "Patient-flow Forecast" module before proceeding.')
 
             # Display results text if already calculated and stored
             if 'results_text' in st.session_state:
                 for text in st.session_state['results_text']:
                     st.write(text)
-            else:
-                st.warning('Please calculate "Drug-treated Patients" in the "Patient-flow Forecast" module before proceeding.')
         
         # Drug Classification Analysis
         elif choice == 'Drug Classification Analysis':
