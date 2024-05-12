@@ -2191,54 +2191,77 @@ def display_main_application_content():
                 potential_patients = calculate_potential_patients(diagnosed_population, st.session_state['data']['access_rate'])
                 drug_treated_patients = calculate_drug_treated_patients(potential_patients, st.session_state['data']['treatment_rate'])
                 
-                # Store the drug-treated patients value in session state
-                st.session_state['drug_treated_patients'] = drug_treated_patients
+                # Store the results in session state
+                st.session_state['results'] = {
+                    'prevalent_population': prevalent_population,
+                    'symptomatic_population': symptomatic_population,
+                    'diagnosed_population': diagnosed_population,
+                    'potential_patients': potential_patients,
+                    'drug_treated_patients': drug_treated_patients
+                }
 
-                st.write(f"Prevalent Population: {prevalent_population} million")
-                st.write(f"Symptomatic Population: {symptomatic_population} million")
-                st.write(f"Diagnosed Population: {diagnosed_population} million")
-                st.write(f"Potential Patients: {potential_patients} million")
-                st.write(f"Drug-treated Patients: {drug_treated_patients} million")
-                
+            # Display results if already calculated
+            if 'results' in st.session_state:
+                results = st.session_state['results']
+                st.write(f"Prevalent Population: {results['prevalent_population']} million")
+                st.write(f"Symptomatic Population: {results['symptomatic_population']} million")
+                st.write(f"Diagnosed Population: {results['diagnosed_population']} million")
+                st.write(f"Potential Patients: {results['potential_patients']} million")
+                st.write(f"Drug-treated Patients: {results['drug_treated_patients']} million")
+                    
             st.subheader('Hypertension First-line and Combination Treatment')
             
-            # Check if 'drug_treated_patients' is in the session state and has a valid value
-            if 'drug_treated_patients' not in st.session_state or st.session_state['drug_treated_patients'] == 0:
-                st.warning('Please calculate "Drug-treated Patients" in the "Patient-flow Forecast" module before proceeding.')
-                return  # Exit the function early to prevent showing further inputs
+            # Check if 'results' are in the session state and 'drug_treated_patients' is calculated and greater than 0
+            if 'results' in st.session_state and st.session_state['results'].get('drug_treated_patients', 0) > 0:
+                drug_treated_patients = st.session_state['results']['drug_treated_patients']
 
-            # Input fields for treatment percentages
-            thiazide_pct = st.number_input("Patients Treated with Thiazide/Thiazide Like Diuretic (%)", min_value=0.0, max_value=100.0, value=0.0)
-            acei_arb_pct = st.number_input("Patients Treated with an ACEi/ARB (%)", min_value=0.0, max_value=100.0, value=0.0)
-            ccb_pct = st.number_input("Patients Treated with a Long-Acting CCB (%)", min_value=0.0, max_value=100.0, value=0.0)
-            combo_pct = st.number_input("Patients Treated with Combination Therapy (%)", min_value=0.0, max_value=100.0, value=0.0)
+                # Input fields for treatment percentages, ensuring values are maintained across sessions
+                thiazide_pct = st.number_input("Patients Treated with Thiazide/Thiazide Like Diuretic (%)", 
+                                               min_value=0.0, max_value=100.0, 
+                                               value=st.session_state.get('thiazide_pct', 0.0))
+                acei_arb_pct = st.number_input("Patients Treated with an ACEi/ARB (%)", 
+                                               min_value=0.0, max_value=100.0, 
+                                               value=st.session_state.get('acei_arb_pct', 0.0))
+                ccb_pct = st.number_input("Patients Treated with a Long-Acting CCB (%)", 
+                                          min_value=0.0, max_value=100.0, 
+                                          value=st.session_state.get('ccb_pct', 0.0))
+                combo_pct = st.number_input("Patients Treated with Combination Therapy (%)", 
+                                            min_value=0.0, max_value=100.0, 
+                                            value=st.session_state.get('combo_pct', 0.0))
 
-            total_percentage = thiazide_pct + acei_arb_pct + ccb_pct + combo_pct
+                # Store updated values immediately in session state
+                st.session_state['thiazide_pct'] = thiazide_pct
+                st.session_state['acei_arb_pct'] = acei_arb_pct
+                st.session_state['ccb_pct'] = ccb_pct
+                st.session_state['combo_pct'] = combo_pct
 
-            if total_percentage != 100:
-                st.error('Total percentage must equal exactly 100%. Please adjust the values.')
+                total_percentage = thiazide_pct + acei_arb_pct + ccb_pct + combo_pct
+
+                if total_percentage != 100:
+                    st.error('Total percentage must equal exactly 100%. Please adjust the values.')
+                else:
+                    if st.button("Calculate Treatment Distribution"):
+                        # Perform the calculations
+                        patients_thiazide = (thiazide_pct / 100) * drug_treated_patients * 1000
+                        patients_acei_arb = (acei_arb_pct / 100) * drug_treated_patients * 1000
+                        patients_ccb = (ccb_pct / 100) * drug_treated_patients * 1000
+                        patients_combo = (combo_pct / 100) * drug_treated_patients * 1000
+
+                        # Store calculated values and results text in session state
+                        st.session_state['results_text'] = [
+                            f"Number of Patients taking Thiazide/Thiazide Diuretics: {patients_thiazide:.2f} thousand",
+                            f"Number of Patients taking ACEi/ARB: {patients_acei_arb:.2f} thousand",
+                            f"Number of Patients taking Long-Acting CCB: {patients_ccb:.2f} thousand",
+                            f"Number of Patients taking Combination Therapy: {patients_combo:.2f} thousand"
+                        ]
+
+            # Display results text if already calculated and stored
+            if 'results_text' in st.session_state:
+                for text in st.session_state['results_text']:
+                    st.write(text)
             else:
-                if st.button("Calculate Treatment Distribution"):
-                    drug_treated_patients = st.session_state['drug_treated_patients']
-
-                    # Calculation based on the percentages
-                    patients_thiazide = (thiazide_pct / 100) * drug_treated_patients * 1000
-                    patients_acei_arb = (acei_arb_pct / 100) * drug_treated_patients * 1000
-                    patients_ccb = (ccb_pct / 100) * drug_treated_patients * 1000
-                    patients_combo = (combo_pct / 100) * drug_treated_patients * 1000
-
-                    # Store calculated values in session state
-                    st.session_state['patients_thiazide'] = patients_thiazide
-                    st.session_state['patients_acei_arb'] = patients_acei_arb
-                    st.session_state['patients_ccb'] = patients_ccb
-                    st.session_state['patients_combo'] = patients_combo
-
-                    st.write(f"Number of Patients taking Thiazide/Thiazide Diuretics: {patients_thiazide:.2f} thousand")
-                    st.write(f"Number of Patients taking ACEi/ARB: {patients_acei_arb:.2f} thousand")
-                    st.write(f"Number of Patients taking Long-Acting CCB: {patients_ccb:.2f} thousand")
-                    st.write(f"Number of Patients taking Combination Therapy: {patients_combo:.2f} thousand")
-
-                
+                st.warning('Please calculate "Drug-treated Patients" in the "Patient-flow Forecast" module before proceeding.')
+        
         # Drug Classification Analysis
         elif choice == 'Drug Classification Analysis':
             st.subheader('Drug Classification Analysis')
@@ -2324,12 +2347,18 @@ def display_main_application_content():
                 # Create multi-level columns for each year with "Total Count" and "% For the Year"
                 pivot_df.columns = pivot_df.columns.map('{0[0]} {0[1]}'.format)
                 pivot_df = pivot_df.sort_index(axis=1, level=1)
+                
+                # Extract years from column names, convert to float first to ensure correct handling, and then convert to int to remove decimals
+                years = np.unique([int(float(col.split(' ')[-1])) for col in pivot_df.columns])
 
                 # Rearrange columns to have "Count" and "% Total" next to each other for each year
                 new_order = []
-                years = np.unique([col.split(' ')[-1] for col in pivot_df.columns])
-                for year in sorted(years, key=int):
-                    new_order.extend(sorted([col for col in pivot_df.columns if year in col], key=lambda x: x.split()[0], reverse=True))
+                for year in sorted(years):  # years are already integers, no need for further conversion
+                    year_columns = [col for col in pivot_df.columns if str(year) in col]
+                    sorted_columns = sorted(year_columns, key=lambda x: x.split()[0], reverse=True)
+                    new_order.extend(sorted_columns)
+
+                # Reorder the DataFrame columns according to the new order
                 pivot_df = pivot_df[new_order]
 
                 # Format percentages to two decimal places
