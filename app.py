@@ -2284,7 +2284,7 @@ def display_main_application_content():
                     st.write(text)
                     
             # Heading for the new module
-            st.header("Non-Insulin Depended Diabetes Mellitus Treatment")
+            st.subheader("Non-Insulin Depended Diabetes Mellitus Treatment")
             
             # Check if drug-treated patients are calculated
             if 'results' not in st.session_state or 'drug_treated_patients' not in st.session_state['results']:
