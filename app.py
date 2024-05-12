@@ -695,6 +695,26 @@ def get_route_from_df_route(df_route_value):
         return df_route_value.split(';')[-1]
     return None
 
+# Define a function to calculate and store the number of patients per therapy type in thousands
+def calculate_patients():
+    # Access drug_treated_patients from the nested dictionary in session state
+    drug_treated_patients = st.session_state['results']['drug_treated_patients']
+    
+    # Calculate the number of patients for each therapy type, converting results into thousands
+    monotherapy = st.session_state.monotherapy_percentage / 100 * drug_treated_patients * 1000
+    dual_therapy = st.session_state.dual_therapy_percentage / 100 * drug_treated_patients * 1000
+    triple_therapy = st.session_state.triple_therapy_percentage / 100 * drug_treated_patients * 1000
+    combo_injectable_therapy = st.session_state.combo_injectable_percentage / 100 * drug_treated_patients * 1000
+
+    # Update session state with the calculated values
+    st.session_state.update({
+        "patients_on_monotherapy": monotherapy,
+        "patients_on_dual_therapy": dual_therapy,
+        "patients_on_triple_therapy": triple_therapy,
+        "patients_on_combo_injectable_therapy": combo_injectable_therapy,
+    })
+
+    
 def display_main_application_content():
                         
     # Initialize mcaz_register as an empty DataFrame at the start
@@ -2262,6 +2282,43 @@ def display_main_application_content():
             if 'results_text' in st.session_state:
                 for text in st.session_state['results_text']:
                     st.write(text)
+                    
+            # Heading for the new module
+            st.header("Non-Insulin Depended Diabetes Mellitus Treatment")
+            
+            # Check if drug-treated patients are calculated
+            if 'results' not in st.session_state or 'drug_treated_patients' not in st.session_state['results']:
+                st.error("Please calculate 'Drug-treated Patients' in the 'Patient-flow Forecast' module before proceeding.")
+            else:
+                # Input fields for treatment percentages, explicitly stored in session state
+                monotherapy_percentage = st.number_input("Monotherapy with Metformin (%)", min_value=0.0, max_value=100.0, value=st.session_state.get('monotherapy_percentage', 0.0), step=0.1)
+                dual_therapy_percentage = st.number_input("Dual Therapy with Metformin and Other (%)", min_value=0.0, max_value=100.0, value=st.session_state.get('dual_therapy_percentage', 0.0), step=0.1)
+                triple_therapy_percentage = st.number_input("Triple Therapy with Metformin (%)", min_value=0.0, max_value=100.0, value=st.session_state.get('triple_therapy_percentage', 0.0), step=0.1)
+                combo_injectable_percentage = st.number_input("Combination Injectable Therapy with Metformin (%)", min_value=0.0, max_value=100.0, value=st.session_state.get('combo_injectable_percentage', 0.0), step=0.1)
+
+                # Store inputs in session state immediately after input
+                st.session_state.monotherapy_percentage = monotherapy_percentage
+                st.session_state.dual_therapy_percentage = dual_therapy_percentage
+                st.session_state.triple_therapy_percentage = triple_therapy_percentage
+                st.session_state.combo_injectable_percentage = combo_injectable_percentage
+
+                # Calculate the total percentage
+                total_percentage = (
+                    monotherapy_percentage + 
+                    dual_therapy_percentage + 
+                    triple_therapy_percentage + 
+                    combo_injectable_percentage
+                )
+
+                if total_percentage != 100:
+                    st.error("The total percentage must exactly equal 100%. Please adjust the inputs.")
+                else:
+                    calculate_patients()
+                    st.success(f"Total therapy distribution is exactly {total_percentage}%. Calculations updated.")
+                    st.write(f"Number of Patients on Monotherapy (in thousands): {st.session_state['patients_on_monotherapy']:.2f}k")
+                    st.write(f"Number of Patients on Dual Therapy (in thousands): {st.session_state['patients_on_dual_therapy']:.2f}k")
+                    st.write(f"Number of Patients on Triple Therapy (in thousands): {st.session_state['patients_on_triple_therapy']:.2f}k")
+                    st.write(f"Number of Patients on Combination Injectable Therapy (in thousands): {st.session_state['patients_on_combo_injectable_therapy']:.2f}k")
         
         # Drug Classification Analysis
         elif choice == 'Drug Classification Analysis':
