@@ -1685,7 +1685,7 @@ def display_main_application_content():
                 filtered_columns = [
                     'Ingredient', 'DF;Route', 'Strength', 'Trade_Name', 
                     'Applicant', 'Patent_No', 'Approval_Date', 
-                    'Patent_Expire_Date_Text'
+                    'Patent_Expire_Date_Text', 'Drug_Product_Flag'
                 ]
 
                 # Select only the specified columns
@@ -2162,28 +2162,83 @@ def display_main_application_content():
         elif choice == 'Patient-flow Forecast':
             st.subheader('Patient-flow Forecast')
             # Implement Patient flow Forecast
+            
+            # Initialize session state for drug-treated patients if not already set
+            if 'drug_treated_patients' not in st.session_state:
+                st.session_state['drug_treated_patients'] = 0.0
+            
+            if 'data' not in st.session_state:
+                st.session_state['data'] = {
+                    'population': 1.0,
+                    'prevalence': 1.0,
+                    'symptomatic_rate': 1.0,
+                    'diagnosis_rate': 1.0,
+                    'access_rate': 1.0,
+                    'treatment_rate': 1.0
+                }
 
-            # Input fields
-            population = st.number_input("Population (millions)", min_value=0.0, value=1.0, step=0.1)
-            prevalence = st.number_input("Epidemiology (prevalence %)", min_value=0.0, max_value=100.0, value=1.0, step=0.1)
-            symptomatic_rate = st.number_input("Symptomatic rate (%)", min_value=0.0, max_value=100.0, value=1.0, step=0.1)
-            diagnosis_rate = st.number_input("Diagnosis rate (%)", min_value=0.0, max_value=100.0, value=1.0, step=0.1)
-            access_rate = st.number_input("Access rate (%)", min_value=0.0, max_value=100.0, value=1.0, step=0.1)
-            treatment_rate = st.number_input("Drug-treated patients (%)", min_value=0.0, max_value=100.0, value=1.0, step=0.1)
+            st.session_state['data']['population'] = st.number_input("Population (millions)", min_value=0.0, value=st.session_state['data']['population'], step=0.1)
+            st.session_state['data']['prevalence'] = st.number_input("Epidemiology (prevalence %)", min_value=0.0, max_value=100.0, value=st.session_state['data']['prevalence'], step=0.1)
+            st.session_state['data']['symptomatic_rate'] = st.number_input("Symptomatic rate (%)", min_value=0.0, max_value=100.0, value=st.session_state['data']['symptomatic_rate'], step=0.1)
+            st.session_state['data']['diagnosis_rate'] = st.number_input("Diagnosis rate (%)", min_value=0.0, max_value=100.0, value=st.session_state['data']['diagnosis_rate'], step=0.1)
+            st.session_state['data']['access_rate'] = st.number_input("Access rate (%)", min_value=0.0, max_value=100.0, value=st.session_state['data']['access_rate'], step=0.1)
+            st.session_state['data']['treatment_rate'] = st.number_input("Drug-treated patients (%)", min_value=0.0, max_value=100.0, value=st.session_state['data']['treatment_rate'], step=0.1)
 
             if st.button("Calculate"):
-                prevalent_population = calculate_prevalent_population(population, prevalence)
-                symptomatic_population = calculate_symptomatic_population(prevalent_population, symptomatic_rate)
-                diagnosed_population = calculate_diagnosed_population(symptomatic_population, diagnosis_rate)
-                potential_patients = calculate_potential_patients(diagnosed_population, access_rate)
-                drug_treated_patients = calculate_drug_treated_patients(potential_patients, treatment_rate)
+                prevalent_population = calculate_prevalent_population(st.session_state['data']['population'], st.session_state['data']['prevalence'])
+                symptomatic_population = calculate_symptomatic_population(prevalent_population, st.session_state['data']['symptomatic_rate'])
+                diagnosed_population = calculate_diagnosed_population(symptomatic_population, st.session_state['data']['diagnosis_rate'])
+                potential_patients = calculate_potential_patients(diagnosed_population, st.session_state['data']['access_rate'])
+                drug_treated_patients = calculate_drug_treated_patients(potential_patients, st.session_state['data']['treatment_rate'])
+                
+                # Store the drug-treated patients value in session state
+                st.session_state['drug_treated_patients'] = drug_treated_patients
 
                 st.write(f"Prevalent Population: {prevalent_population} million")
                 st.write(f"Symptomatic Population: {symptomatic_population} million")
                 st.write(f"Diagnosed Population: {diagnosed_population} million")
                 st.write(f"Potential Patients: {potential_patients} million")
                 st.write(f"Drug-treated Patients: {drug_treated_patients} million")
+                
+            st.subheader('Hypertension First-line and Combination Treatment')
+            
+            # Check if 'drug_treated_patients' is in the session state and has a valid value
+            if 'drug_treated_patients' not in st.session_state or st.session_state['drug_treated_patients'] == 0:
+                st.warning('Please calculate "Drug-treated Patients" in the "Patient-flow Forecast" module before proceeding.')
+                return  # Exit the function early to prevent showing further inputs
 
+            # Input fields for treatment percentages
+            thiazide_pct = st.number_input("Patients Treated with Thiazide/Thiazide Like Diuretic (%)", min_value=0.0, max_value=100.0, value=0.0)
+            acei_arb_pct = st.number_input("Patients Treated with an ACEi/ARB (%)", min_value=0.0, max_value=100.0, value=0.0)
+            ccb_pct = st.number_input("Patients Treated with a Long-Acting CCB (%)", min_value=0.0, max_value=100.0, value=0.0)
+            combo_pct = st.number_input("Patients Treated with Combination Therapy (%)", min_value=0.0, max_value=100.0, value=0.0)
+
+            total_percentage = thiazide_pct + acei_arb_pct + ccb_pct + combo_pct
+
+            if total_percentage != 100:
+                st.error('Total percentage must equal exactly 100%. Please adjust the values.')
+            else:
+                if st.button("Calculate Treatment Distribution"):
+                    drug_treated_patients = st.session_state['drug_treated_patients']
+
+                    # Calculation based on the percentages
+                    patients_thiazide = (thiazide_pct / 100) * drug_treated_patients * 1000
+                    patients_acei_arb = (acei_arb_pct / 100) * drug_treated_patients * 1000
+                    patients_ccb = (ccb_pct / 100) * drug_treated_patients * 1000
+                    patients_combo = (combo_pct / 100) * drug_treated_patients * 1000
+
+                    # Store calculated values in session state
+                    st.session_state['patients_thiazide'] = patients_thiazide
+                    st.session_state['patients_acei_arb'] = patients_acei_arb
+                    st.session_state['patients_ccb'] = patients_ccb
+                    st.session_state['patients_combo'] = patients_combo
+
+                    st.write(f"Number of Patients taking Thiazide/Thiazide Diuretics: {patients_thiazide:.2f} thousand")
+                    st.write(f"Number of Patients taking ACEi/ARB: {patients_acei_arb:.2f} thousand")
+                    st.write(f"Number of Patients taking Long-Acting CCB: {patients_ccb:.2f} thousand")
+                    st.write(f"Number of Patients taking Combination Therapy: {patients_combo:.2f} thousand")
+
+                
         # Drug Classification Analysis
         elif choice == 'Drug Classification Analysis':
             st.subheader('Drug Classification Analysis')
@@ -2406,16 +2461,27 @@ def display_main_application_content():
                     st.write(filtered_df)
                 else:
                     st.write("No data to display after filtering.")
-
+                    
                 # Download button for filtered data
                 if not filtered_df.empty:
                     csv_data = convert_df_to_csv(filtered_df)
+                    file_name = f"filtered_data_{company_name}.csv"
                     st.download_button(
                         label="Download data as CSV",
                         data=csv_data,
-                        file_name='filtered_data.csv',
+                        file_name=file_name,
                         mime='text/csv',
                     )
+
+#                 # Download button for filtered data
+#                 if not filtered_df.empty:
+#                     csv_data = convert_df_to_csv(filtered_df)
+#                     st.download_button(
+#                         label="Download data as CSV",
+#                         data=csv_data,
+#                         file_name='filtered_data.csv',
+#                         mime='text/csv',
+#                     )
             else:
                 st.write("Please upload a sales data CSV file to get started.")
                 
