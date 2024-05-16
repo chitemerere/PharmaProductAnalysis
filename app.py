@@ -2293,7 +2293,7 @@ def display_main_application_content():
                 # Input fields for treatment percentages, explicitly stored in session state
                 monotherapy_percentage = st.number_input("Monotherapy with Metformin (%)", min_value=0.0, max_value=100.0, value=st.session_state.get('monotherapy_percentage', 0.0), step=0.1)
                 dual_therapy_percentage = st.number_input("Dual Therapy with Metformin and Other (%)", min_value=0.0, max_value=100.0, value=st.session_state.get('dual_therapy_percentage', 0.0), step=0.1)
-                triple_therapy_percentage = st.number_input("Triple Therapy with Metformin (%)", min_value=0.0, max_value=100.0, value=st.session_state.get('triple_therapy_percentage', 0.0), step=0.1)
+                triple_therapy_percentage = st.number_input("Triple Therapy with Metformin and Other (%)", min_value=0.0, max_value=100.0, value=st.session_state.get('triple_therapy_percentage', 0.0), step=0.1)
                 combo_injectable_percentage = st.number_input("Combination Injectable Therapy with Metformin (%)", min_value=0.0, max_value=100.0, value=st.session_state.get('combo_injectable_percentage', 0.0), step=0.1)
 
                 # Store inputs in session state immediately after input
