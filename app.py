@@ -724,8 +724,8 @@ def display_main_application_content():
     selected_generic_names = []   
 
     # Sidebar for navigation
-    menu = ['Data Overview', 'Market Analysis', 'Manufacturer Analysis', 'FDA Orange Book Analysis', 
-            'Applicant Analysis', 'Drugs@FDA Analysis','Patient-flow Forecast', 'Drug Classification Analysis', 
+    menu = ['Data Overview', 'Market Analysis', 'Principal Analysis', 'FDA Orange Book Analysis', 
+            'FDA Applicant Analysis', 'Drugs@FDA Analysis','Patient-flow Forecast', 'Drug Classification Analysis', 
             'Drugs with no Competition', 'Top Pharma Companies Sales', 'FDA Drug Establishment Sites', 
             'FDA NME & New Biologic Approvals', 'EMA FDA Health Canada Approvals 2023']
     choice = st.sidebar.radio("Menu", menu)
@@ -1334,23 +1334,23 @@ def display_main_application_content():
                     st.error(f"An error occurred while processing the file: {str(e)}")
                    
         # Manufacturer Analysis
-        elif choice == 'Manufacturer Analysis':
-            st.subheader('Manufacturer Analysis')
+        elif choice == 'Principal Analysis':
+            st.subheader('Principal Analysis')
 
             # Ensure all manufacturers are strings and handle NaN values
-            all_manufacturers = data['Manufacturers'].dropna().unique()
+            all_manufacturers = data['Principal Name'].dropna().unique()
             all_manufacturers = [str(manufacturer) for manufacturer in all_manufacturers]
             all_manufacturers.sort()
 
             # Adding 'All Manufacturers' option
-            manufacturers_options = ['All Manufacturers'] + all_manufacturers
-            selected_manufacturer = st.selectbox('Select Manufacturer', manufacturers_options, index=0)
+            manufacturers_options = ['All Principals'] + all_manufacturers
+            selected_manufacturer = st.selectbox('Select Principal', manufacturers_options, index=0)
 
-            # Filtering data based on the selected manufacturer
-            if selected_manufacturer == 'All Manufacturers':
+            # Filtering data based on the selected principal
+            if selected_manufacturer == 'All Principals':
                 filtered_data = data
             else:
-                filtered_data = data[data['Manufacturers'] == selected_manufacturer]
+                filtered_data = data[data['Principal Name'] == selected_manufacturer]
 
             # Convert 'Date Registered' to datetime
             filtered_data['Date Registered'] = pd.to_datetime(filtered_data['Date Registered'], format='%m/%d/%Y', errors='coerce')
@@ -1982,8 +1982,8 @@ def display_main_application_content():
                 st.write("Data not available. Please ensure data is loaded and processed.")
                 
         # Applicant Analysis
-        elif choice == 'Applicant Analysis':
-            st.subheader('Applicant Analysis')
+        elif choice == 'FDA Applicant Analysis':
+            st.subheader('FDA Applicant Analysis')
             
             # Anatomial Main Group
             st.subheader("Anatomcal Main Group Count")
