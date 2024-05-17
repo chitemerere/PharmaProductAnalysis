@@ -1333,7 +1333,7 @@ def display_main_application_content():
                     # This will catch all exceptions, including any related to empty data or parsing issues
                     st.error(f"An error occurred while processing the file: {str(e)}")
                    
-        # Manufacturer Analysis
+        # Principal Analysis
         elif choice == 'Principal Analysis':
             st.subheader('Principal Analysis')
 
@@ -1939,48 +1939,62 @@ def display_main_application_content():
             else:
                 # Handle the case where 'csv' is None, e.g., display a message or take alternative action
                 print("No data available to convert to CSV")
+                
+            # Primary filter options presented to the user
+            primary_filter_options = ["None", "ATCLevelOneDescript", "ATCLevelTwoDescript", "ATCLevelThreeDescript", "Chemical Subgroup", "Ingredient"]
+            selected_primary_filter = st.radio("Select a primary filter", primary_filter_options)
 
-            # Filter options presented to the user
-            filter_options = ["None", "ATCLevelOneDescript", "ATCLevelTwoDescript", "ATCLevelThreeDescript", "Chemical Subgroup", "Ingredient"]
-            selected_filter = st.radio("Select a filter", filter_options)
+            # Secondary filter options (Applicant filter)
+            applicant_filter_options = ["None", "Applicant"]
+            selected_applicant_filter = st.radio("Select a secondary filter", applicant_filter_options)
 
             # Check if 'fda_with_ATCCodeDescription' is in session state and is not empty
             if 'fda_with_ATCCodeDescription' in st.session_state and not st.session_state['fda_with_ATCCodeDescription'].empty:
-                # Condition to handle filtering
-                if selected_filter != "None":
+                # Initialize filtered_data with the full dataset
+                filtered_data = st.session_state['fda_with_ATCCodeDescription'].copy()
+
+                # Track applied filters
+                applied_filters = []
+
+                # Apply primary filter if selected
+                if selected_primary_filter != "None":
                     # Convert all values in the selected filter column to string, get unique values, and sort
-                    filter_values = sorted(st.session_state['fda_with_ATCCodeDescription'][selected_filter].astype(str).unique())
-                    selected_values = st.multiselect(f"Select {selected_filter}", filter_values)
+                    primary_filter_values = sorted(filtered_data[selected_primary_filter].astype(str).unique())
+                    selected_primary_values = st.multiselect(f"Select {selected_primary_filter}", primary_filter_values)
 
-                    # Initialize filtered_data with the full dataset to handle scope
-                    filtered_data = st.session_state['fda_with_ATCCodeDescription'].copy()
+                    if selected_primary_values:
+                        # Apply filter based on selected primary values
+                        filtered_data = filtered_data[filtered_data[selected_primary_filter].astype(str).isin(selected_primary_values)]
+                        applied_filters.append(selected_primary_filter)
 
-                    if selected_values:
-                        # Apply filter based on selected values
-                        filtered_data = filtered_data[filtered_data[selected_filter].astype(str).isin(selected_values)]
-                        st.write(f"Filtered Data by {selected_filter}:")
-                    else:
-                        st.write("Displaying unfiltered data (no specific filter values selected):")
+                # Apply secondary filter if selected
+                if selected_applicant_filter == "Applicant":
+                    # Convert all values in the applicant filter column to string, get unique values, and sort
+                    applicant_filter_values = sorted(filtered_data["Applicant"].astype(str).unique())
+                    selected_applicant_values = st.multiselect("Select Applicant", applicant_filter_values)
 
-                    # Display filtered data and count
-                    st.dataframe(filtered_data)
-                    st.write(f"Filtered data count: {len(filtered_data)}")
+                    if selected_applicant_values:
+                        # Apply filter based on selected applicant values
+                        filtered_data = filtered_data[filtered_data["Applicant"].astype(str).isin(selected_applicant_values)]
+                        applied_filters.append("Applicant")
 
-                    # Offer CSV download for filtered data
-                    csv = convert_df_to_csv(filtered_data)
-                    st.download_button(label="Download Filtered Data as CSV", data=csv, file_name='fda_register_filtered.csv', mime='text/csv', key='download_filtered')
+                # Display filtered data and count
+                if applied_filters:
+                    st.write(f"Filtered Data by {', '.join(applied_filters)}:")
                 else:
-                    st.write("No filter selected. Displaying unfiltered data:")
-                    st.dataframe(st.session_state['fda_with_ATCCodeDescription'])
-                    st.write(f"Total data count: {len(st.session_state['fda_with_ATCCodeDescription'])}")
+                    st.write("Displaying unfiltered data (no specific filter values selected):")
 
-                    # Optionally, offer download of unfiltered data
-                    csv = convert_df_to_csv(st.session_state['fda_with_ATCCodeDescription'])
-                    st.download_button(label="Download Unfiltered Data as CSV", data=csv, file_name='fda_register_unfiltered.csv', mime='text/csv', key='download_unfiltered')
+                st.dataframe(filtered_data)
+                st.write(f"Filtered data count: {len(filtered_data)}")
+
+                # Offer CSV download for filtered data
+                csv = convert_df_to_csv(filtered_data)
+                st.download_button(label="Download Filtered Data as CSV", data=csv, file_name='fda_register_filtered.csv', mime='text/csv', key='download_filtered')
+
             else:
                 # Handle case where the data isn't available or hasn't been loaded
                 st.write("Data not available. Please ensure data is loaded and processed.")
-                
+
         # Applicant Analysis
         elif choice == 'FDA Applicant Analysis':
             st.subheader('FDA Applicant Analysis')
