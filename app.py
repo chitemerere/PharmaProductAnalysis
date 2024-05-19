@@ -1332,6 +1332,33 @@ def display_main_application_content():
                 except Exception as e:
                     # This will catch all exceptions, including any related to empty data or parsing issues
                     st.error(f"An error occurred while processing the file: {str(e)}")
+                    
+            # Add a subheader for the new section
+            st.subheader("Portfolio Maturity Analysis")
+
+            # Ensure all entries in the 'Principal Name' column are strings
+            data['Principal Name'] = data['Principal Name'].astype(str)
+
+            # Calculate the age of each product in years
+            today = datetime.today()
+            data['Age since Registration'] = data['Date Registered'].apply(lambda x: (today - pd.to_datetime(x)).days / 365)
+
+            # Filter options, sorted in descending order
+            filter_options = ['All'] + sorted(data['Principal Name'].unique(), reverse=False)
+            selected_principal = st.selectbox("Filter by Principal Name", filter_options)
+
+            # Apply the filter
+            if selected_principal != 'All':
+                filtered_data = data[data['Principal Name'] == selected_principal]
+            else:
+                filtered_data = data
+
+            # Display the filtered dataframe
+            st.dataframe(filtered_data[['Trade Name', 'Generic Name', 'Principal Name', 'Age since Registration']])
+
+            # Calculate the average age of the product portfolio
+            average_age = filtered_data['Age since Registration'].mean()
+            st.write(f"Average Age of Product Portfolio: {average_age:.2f} years")
                    
         # Principal Analysis
         elif choice == 'Principal Analysis':
