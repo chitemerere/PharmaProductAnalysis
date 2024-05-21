@@ -1336,27 +1336,34 @@ def display_main_application_content():
             # Add a subheader for the new section
             st.subheader("Portfolio Maturity Analysis")
 
-            # Ensure all entries in the 'Principal Name' column are strings
+            # Ensure all entries in the 'Principal Name' and 'Generic Name' columns are strings
             data['Principal Name'] = data['Principal Name'].astype(str)
+            data['Generic Name'] = data['Generic Name'].astype(str)
 
             # Calculate the age of each product in years
             today = datetime.today()
             data['Age since Registration'] = data['Date Registered'].apply(lambda x: (today - pd.to_datetime(x)).days / 365)
 
-            # Filter options, sorted in descending order
-            filter_options = ['All'] + sorted(data['Principal Name'].unique(), reverse=False)
-            selected_principal = st.selectbox("Filter by Principal Name", filter_options)
+            # Filter options for Principal Name, sorted in ascending order
+            principal_filter_options = ['All'] + sorted(data['Principal Name'].unique(), reverse=False)
+            selected_principal = st.selectbox("Filter by Principal Name", principal_filter_options)
 
-            # Apply the filter
+            # Filter options for Generic Name, sorted in ascending order
+            generic_filter_options = ['All'] + sorted(data['Generic Name'].unique(), reverse=False)
+            selected_generic = st.selectbox("Filter by Generic Name", generic_filter_options)
+
+            # Apply the filters
+            filtered_data = data
             if selected_principal != 'All':
-                filtered_data = data[data['Principal Name'] == selected_principal]
-            else:
-                filtered_data = data
+                filtered_data = filtered_data[filtered_data['Principal Name'] == selected_principal]
+
+            if selected_generic != 'All':
+                filtered_data = filtered_data[filtered_data['Generic Name'] == selected_generic]
 
             # Display the filtered dataframe
-            st.dataframe(filtered_data[['Trade Name', 'Generic Name', 'Principal Name', 'Age since Registration']])
+            st.dataframe(filtered_data[['Trade Name', 'Generic Name','Strength','Form' ,'Principal Name', 'Age since Registration']])
 
-            # Calculate the average age of the product portfolio
+            # Calculate and display the average age of the product portfolio
             average_age = filtered_data['Age since Registration'].mean()
             st.write(f"Average Age of Product Portfolio: {average_age:.2f} years")
                    
