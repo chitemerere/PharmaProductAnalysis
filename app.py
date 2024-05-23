@@ -713,7 +713,10 @@ def calculate_patients():
         "patients_on_triple_therapy": triple_therapy,
         "patients_on_combo_injectable_therapy": combo_injectable_therapy,
     })
-
+    
+# Function to load data from the uploaded file
+def load_data_maturity(uploaded_file):
+    return pd.read_csv(uploaded_file)  # Adjust this if your file is not a CSV
     
 def display_main_application_content():
                         
@@ -2861,6 +2864,95 @@ def display_main_application_content():
             if 'selected_analysis' in st.session_state:
                 if st.session_state['selected_analysis'] == "Drugs@FDA Analysis":
                     perform_drugs_fda_analysis()
+                    
+            # Add a subheader for the new section
+            st.subheader("FDA Portfolio Maturity Analysis")
+            
+            # File uploader
+            uploaded_file = st.file_uploader("Choose a file")
+            if uploaded_file is not None:
+                merged_df = load_data_maturity(uploaded_file)
+                st.session_state['merged_df'] = merged_df
+
+                # Ensure 'SubmissionStatusDate' is in datetime format
+                merged_df['SubmissionStatusDate'] = pd.to_datetime(merged_df['SubmissionStatusDate'])
+
+                # Filter for NDA type
+                nda_df = merged_df[merged_df['ApplType'] == 'NDA']
+
+                # Determine the Patent Expiry Date
+                def get_patent_expiry_date(df, active_ingredient, submission_date):
+                    relevant_dates = df[(df['ActiveIngredient'] == active_ingredient) & 
+                                        (df['ApplType'] == 'ANDA') & 
+                                        (df['SubmissionStatus'] == 'AP')]['SubmissionStatusDate']
+
+                    if not relevant_dates.empty:
+                        return relevant_dates.min() - pd.Timedelta(days=1)
+                    else:
+                        return pd.NaT
+
+                # Apply the function to each row in nda_df
+                nda_df['Patent Expiry Date'] = nda_df.apply(lambda row: get_patent_expiry_date(merged_df, row['ActiveIngredient'], row['SubmissionStatusDate']), axis=1)
+
+                # Ensure 'Patent Expiry Date' is in datetime format
+                nda_df['Patent Expiry Date'] = pd.to_datetime(nda_df['Patent Expiry Date'])
+
+                # Calculate Age Since Patent Expiry
+                today = datetime.today()
+                nda_df['Age Since Patent Expiry'] = nda_df['Patent Expiry Date'].apply(lambda x: (today - x).days / 365 if pd.notna(x) else None)
+
+                # Add Status column based on Age Since Patent Expiry
+                def determine_status(row):
+                    age = row['Age Since Patent Expiry']
+                    expiry_date = row['Patent Expiry Date']
+                    if pd.isna(expiry_date) or (age is not None and age <= 4) or (merged_df['ApplType'] == 'ANDA').empty and (merged_df['SubmissionStatus']=='AP'): 
+                        return "Third Generation Generics"
+                    elif age is not None and 4 < age <= 10:
+                        return "Second Generation Generics"
+                    elif age is not None and age > 10:
+                        return "First Generation Generics"
+                    return None
+
+                nda_df['Status'] = nda_df.apply(determine_status, axis=1)
+
+                # Filter options for ActiveIngredient, sorted in ascending order
+                active_ingredient_filter_options = ['All'] + sorted(nda_df['ActiveIngredient'].unique())
+                selected_active_ingredient = st.selectbox("Filter by Active Ingredient", active_ingredient_filter_options)
+
+                # Apply the ActiveIngredient filter
+                if selected_active_ingredient != 'All':
+                    nda_df = nda_df[nda_df['ActiveIngredient'] == selected_active_ingredient]
+
+                # Filter options for Status, sorted in ascending order
+                status_filter_options = ['All'] + sorted(nda_df['Status'].dropna().unique())
+                selected_status = st.selectbox("Filter by Status", status_filter_options)
+
+                # Apply the Status filter
+                if selected_status != 'All':
+                    nda_df = nda_df[nda_df['Status'] == selected_status]
+
+                # Select required columns and include all products with the same ActiveIngredient
+                result_df = nda_df[['DrugName', 'ActiveIngredient', 'Form', 'Strength', 'SponsorName', 'Patent Expiry Date', 'Age Since Patent Expiry', 'Status']]
+
+                # Remove duplicates
+                result_df = result_df.drop_duplicates()
+                st.session_state['result_df'] = result_df
+
+                # Display the final dataframe
+                st.dataframe(result_df)
+                # Display the count of the filtered dataframe
+                st.write(f'Count of filtered results: {len(result_df)}')
+
+                # Button to save the filtered data as CSV
+                csv = result_df.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="Download filtered data as CSV",
+                    data=csv,
+                    file_name='filtered_result_df.csv',
+                    mime='text/csv',
+                )
+            else:
+                st.write("Please upload a Drugs@FDA file to analyze")
               
     else:
         st.warning('Please upload MCAZ Register CSV file.')
