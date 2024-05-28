@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from fuzzywuzzy import process
 from fuzzywuzzy import fuzz
-from datetime import datetime 
+from datetime import datetime, date 
 import os
 import toml
 import chardet
@@ -717,6 +717,44 @@ def calculate_patients():
 # Function to load data from the uploaded file
 def load_data_maturity(uploaded_file):
     return pd.read_csv(uploaded_file)  # Adjust this if your file is not a CSV
+
+def load_data_dmf(file):
+    try:
+        # Attempt to parse 'SUBMIT DATE' as dates
+        return pd.read_csv(file, parse_dates=['SUBMIT DATE'])
+    except UnicodeDecodeError:
+        return pd.read_csv(file, encoding='ISO-8859-1', parse_dates=['SUBMIT DATE'])
+    
+def handle_filters_and_display(df, filter_columns):
+    for col in filter_columns:
+        if col in df.columns:
+            options = ['All'] + sorted(df[col].unique().tolist())
+            selected_option = st.selectbox(f'Select {col}', options=options, key=f'key_{col}')
+            if selected_option != 'All':
+                df = df[df[col] == selected_option]
+
+    if 'SUBMIT DATE' in df.columns:
+        df['SUBMIT DATE'] = pd.to_datetime(df['SUBMIT DATE']).dt.date
+        min_date, max_date = df['SUBMIT DATE'].min(), df['SUBMIT DATE'].max()
+        date_range = st.slider("Select SUBMIT DATE range", min_value=min_date, max_value=max_date, value=(min_date, max_date))
+        df = df[(df['SUBMIT DATE'] >= date_range[0]) & (df['SUBMIT DATE'] <= date_range[1])]
+
+    if not df.empty:
+        st.dataframe(df)
+        st.write(f"Filtered Data (Count: {len(df)}):")
+        download_filtered_data_as_csv(df)
+    else:
+        st.write("No data matches the selected filters.")
+
+def download_filtered_data_as_csv(df):
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="Download filtered data as CSV",
+        data=csv,
+        file_name='filtered_fda_dmfs.csv',
+        mime='text/csv',
+    )
+
     
 def display_main_application_content():
                         
@@ -730,7 +768,7 @@ def display_main_application_content():
     menu = ['Data Overview', 'Market Analysis', 'Principal Analysis', 'FDA Orange Book Analysis', 
             'FDA Applicant Analysis', 'Drugs@FDA Analysis','Patient-flow Forecast', 'Drug Classification Analysis', 
             'Drugs with no Competition', 'Top Pharma Companies Sales', 'FDA Drug Establishment Sites', 
-            'FDA NME & New Biologic Approvals', 'EMA FDA Health Canada Approvals 2023']
+            'FDA NME & New Biologic Approvals', 'EMA FDA Health Canada Approvals 2023', 'FDA Filed DMFs']
     choice = st.sidebar.radio("Menu", menu)
     
     # File uploader
@@ -2234,11 +2272,9 @@ def display_main_application_content():
             st.subheader('Patient-flow Forecast')
             # Implement Patient flow Forecast
             
-            # Initialize session state for drug-treated patients if not already set
-            if 'drug_treated_patients' not in st.session_state:
-                st.session_state['drug_treated_patients'] = 0.0
-            
-            if 'data' not in st.session_state:
+            # Ensure all keys are initialized in session state
+            required_keys = ['population', 'prevalence', 'symptomatic_rate', 'diagnosis_rate', 'access_rate', 'treatment_rate']
+            if 'data' not in st.session_state or any(key not in st.session_state['data'] for key in required_keys):
                 st.session_state['data'] = {
                     'population': 1.0,
                     'prevalence': 1.0,
@@ -2247,8 +2283,14 @@ def display_main_application_content():
                     'access_rate': 1.0,
                     'treatment_rate': 1.0
                 }
+            
+            if 'population' in st.session_state['data']:
+                st.session_state['data']['population'] = st.number_input("Population (millions)", min_value=0.0, value=st.session_state['data']['population'], step=0.1)
+            else:
+                st.error('Population data is not initialized.')
 
-            st.session_state['data']['population'] = st.number_input("Population (millions)", min_value=0.0, value=st.session_state['data']['population'], step=0.1)
+
+#             st.session_state['data']['population'] = st.number_input("Population (millions)", min_value=0.0, value=st.session_state['data']['population'], step=0.1)
             st.session_state['data']['prevalence'] = st.number_input("Epidemiology (prevalence %)", min_value=0.0, max_value=100.0, value=st.session_state['data']['prevalence'], step=0.1)
             st.session_state['data']['symptomatic_rate'] = st.number_input("Symptomatic rate (%)", min_value=0.0, max_value=100.0, value=st.session_state['data']['symptomatic_rate'], step=0.1)
             st.session_state['data']['diagnosis_rate'] = st.number_input("Diagnosis rate (%)", min_value=0.0, max_value=100.0, value=st.session_state['data']['diagnosis_rate'], step=0.1)
@@ -2611,15 +2653,6 @@ def display_main_application_content():
                         mime='text/csv',
                     )
 
-#                 # Download button for filtered data
-#                 if not filtered_df.empty:
-#                     csv_data = convert_df_to_csv(filtered_df)
-#                     st.download_button(
-#                         label="Download data as CSV",
-#                         data=csv_data,
-#                         file_name='filtered_data.csv',
-#                         mime='text/csv',
-#                     )
             else:
                 st.write("Please upload a sales data CSV file to get started.")
                 
@@ -2852,7 +2885,35 @@ def display_main_application_content():
                 file_name='filtered_fda_ema_healthcanada.csv',
                 mime='text/csv',
             )
-       
+            
+        elif choice == 'FDA Filed DMFs':
+            st.subheader('FDA Filed DMFs')
+            
+            # Check if data is already loaded, otherwise prompt for file upload
+            if 'data' not in st.session_state:
+                uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
+                if uploaded_file is not None:
+                    df = load_data_dmf(uploaded_file)
+                    if isinstance(df, pd.DataFrame):
+                        st.session_state['data'] = df
+                    else:
+                        st.error("The uploaded file is not a valid CSV file.")
+
+            # Once data is loaded, proceed with filtering and display
+            if 'data' in st.session_state and st.session_state['data'] is not None:
+                df = st.session_state['data']
+
+                # Verify that df is a DataFrame
+                if isinstance(df, pd.DataFrame):
+                    # Apply filters
+                    filter_columns = ['STATUS', 'TYPE', 'HOLDER', 'SUBJECT']
+                    handle_filters_and_display(df, filter_columns)
+                else:
+                    st.error("Loaded data is not in the correct format. Please upload a valid CSV file.")
+            else:
+                st.write("Please upload a dmf file to view and filter data.")
+            
+     
         # Assuming 'choice' variable is determined by some user interaction upstream in your code
         if choice == 'Drugs@FDA Analysis':
             
@@ -2868,11 +2929,20 @@ def display_main_application_content():
             # Add a subheader for the new section
             st.subheader("FDA Portfolio Maturity Analysis")
             
+            # Initializing session state for data persistence
+            if 'data' not in st.session_state:
+                st.session_state['data'] = None
+            
             # File uploader
             uploaded_file = st.file_uploader("Choose a file")
             if uploaded_file is not None:
-                merged_df = load_data_maturity(uploaded_file)
-                st.session_state['merged_df'] = merged_df
+                st.session_state['data'] = load_data_maturity(uploaded_file)
+#                 merged_df = load_data_maturity(uploaded_file)
+#                 st.session_state['merged_df'] = merged_df
+                
+                # Display and filter data if loaded
+                if st.session_state['data'] is not None:
+                    merged_df = st.session_state['data']
 
                 # Ensure 'SubmissionStatusDate' is in datetime format
                 merged_df['SubmissionStatusDate'] = pd.to_datetime(merged_df['SubmissionStatusDate'])
