@@ -725,37 +725,35 @@ def load_data_dmf(file):
     except UnicodeDecodeError:
         return pd.read_csv(file, encoding='ISO-8859-1', parse_dates=['SUBMIT DATE'])
     
-def handle_filters_and_display(df, filter_columns):
-    for col in filter_columns:
-        if col in df.columns:
-            options = ['All'] + sorted(df[col].unique().tolist())
-            selected_option = st.selectbox(f'Select {col}', options=options, key=f'key_{col}')
-            if selected_option != 'All':
-                df = df[df[col] == selected_option]
-
-    if 'SUBMIT DATE' in df.columns:
-        df['SUBMIT DATE'] = pd.to_datetime(df['SUBMIT DATE']).dt.date
-        min_date, max_date = df['SUBMIT DATE'].min(), df['SUBMIT DATE'].max()
-        date_range = st.slider("Select SUBMIT DATE range", min_value=min_date, max_value=max_date, value=(min_date, max_date))
-        df = df[(df['SUBMIT DATE'] >= date_range[0]) & (df['SUBMIT DATE'] <= date_range[1])]
-
-    if not df.empty:
-        st.dataframe(df)
-        st.write(f"Filtered Data (Count: {len(df)}):")
-        download_filtered_data_as_csv(df)
-    else:
-        st.write("No data matches the selected filters.")
-
-def download_filtered_data_as_csv(df):
-    csv = df.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="Download filtered data as CSV",
-        data=csv,
-        file_name='filtered_fda_dmfs.csv',
-        mime='text/csv',
-    )
-
+def check_required_columns(df, required_columns):
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        return False, missing_columns
+    return True, None
     
+def filter_data(df, status, type_filter, date_from, date_to, holder, subject, holder_sort, subject_sort):
+    if status != "All":
+        df = df[df['STATUS'] == status]
+    if type_filter != "All":
+        df = df[df['TYPE'] == type_filter]
+            
+    if date_from != "All" and date_to != "All":
+        date_from = pd.Timestamp(date_from)
+        date_to = pd.Timestamp(date_to)
+        df = df[(df['SUBMIT DATE'] >= date_from) & (df['SUBMIT DATE'] <= date_to)]
+
+    if holder != "All":
+        df = df[df['HOLDER'] == holder]
+    if 'All' not in subject:
+        df = df[df['SUBJECT'].isin(subject)]
+
+    if holder_sort != "None":
+        df = df.sort_values(by='HOLDER', ascending=(holder_sort == "Ascending"))
+    if subject_sort != "None":
+        df = df.sort_values(by='SUBJECT', ascending=(subject_sort == "Ascending"))
+
+    return df
+
 def display_main_application_content():
                         
     # Initialize mcaz_register as an empty DataFrame at the start
@@ -2889,31 +2887,43 @@ def display_main_application_content():
         elif choice == 'FDA Filed DMFs':
             st.subheader('FDA Filed DMFs')
             
-            # Check if data is already loaded, otherwise prompt for file upload
-            if 'data' not in st.session_state:
-                uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
-                if uploaded_file is not None:
-                    df = load_data_dmf(uploaded_file)
-                    if isinstance(df, pd.DataFrame):
-                        st.session_state['data'] = df
-                    else:
-                        st.error("The uploaded file is not a valid CSV file.")
+            uploaded_file = st.file_uploader("Upload your file", type=['csv'])
 
-            # Once data is loaded, proceed with filtering and display
-            if 'data' in st.session_state and st.session_state['data'] is not None:
-                df = st.session_state['data']
+            required_columns = ['STATUS', 'TYPE', 'SUBMIT DATE', 'HOLDER', 'SUBJECT']
 
-                # Verify that df is a DataFrame
-                if isinstance(df, pd.DataFrame):
-                    # Apply filters
-                    filter_columns = ['STATUS', 'TYPE', 'HOLDER', 'SUBJECT']
-                    handle_filters_and_display(df, filter_columns)
-                else:
-                    st.error("Loaded data is not in the correct format. Please upload a valid CSV file.")
-            else:
-                st.write("Please upload a dmf file to view and filter data.")
-            
-     
+            if uploaded_file is not None:
+                if 'uploaded_file_name' not in st.session_state or st.session_state.uploaded_file_name != uploaded_file.name:
+                    data = load_data_dmf(uploaded_file)
+                    valid, missing_cols = check_required_columns(data, required_columns)
+                    if not valid:
+                        st.error(f"Missing columns in the uploaded file: {', '.join(missing_cols)}. Please upload a file with all required columns.")
+                        return
+                    st.session_state.data = data
+                    st.session_state.uploaded_file_name = uploaded_file.name
+
+                min_date = st.session_state.data['SUBMIT DATE'].min()
+                max_date = st.session_state.data['SUBMIT DATE'].max()
+
+                # Filters
+                status = st.selectbox('Status', ['All'] + sorted(st.session_state.data['STATUS'].unique().tolist()), index=0)
+                type_filter = st.selectbox('Type', ['All'] + sorted(st.session_state.data['TYPE'].unique().tolist()), index=0)
+                date_from = st.date_input("From Date", min_date, min_value=min_date, max_value=max_date)
+                date_to = st.date_input("To Date", max_date, min_value=min_date, max_value=max_date)
+                holder = st.selectbox('Holder', ['All'] + sorted(st.session_state.data['HOLDER'].unique().tolist()), index=0)
+                holder_sort = st.selectbox('Sort Holder', ["None", "Ascending", "Descending"])
+                subject = st.multiselect('Subject', ['All'] + sorted(st.session_state.data['SUBJECT'].unique().tolist()), default=['All'])
+                subject_sort = st.selectbox('Sort Subject', ["None", "Ascending", "Descending"])
+
+                filtered_data = filter_data(st.session_state.data, status, type_filter, date_from, date_to, holder, subject, holder_sort, subject_sort)
+
+                st.write(filtered_data)
+                st.write("Total records:", filtered_data.shape[0])
+
+                if st.button("Save to CSV"):
+                    csv = filtered_data.to_csv(index=False)
+                    st.download_button(label="Download CSV", data=csv, file_name='filtered_data.csv', mime='text/csv')
+
+    
         # Assuming 'choice' variable is determined by some user interaction upstream in your code
         if choice == 'Drugs@FDA Analysis':
             
