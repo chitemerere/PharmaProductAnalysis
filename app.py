@@ -725,7 +725,7 @@ def load_data_dmf(file):
     except UnicodeDecodeError:
         return pd.read_csv(file, encoding='ISO-8859-1', parse_dates=['SUBMIT DATE'])
     
-def check_required_columns(df, required_columns):
+def check_required_columns_dmf(df, required_columns):
     missing_columns = [col for col in required_columns if col not in df.columns]
     if missing_columns:
         return False, missing_columns
@@ -753,6 +753,12 @@ def filter_data(df, status, type_filter, date_from, date_to, holder, subject, ho
         df = df.sort_values(by='SUBJECT', ascending=(subject_sort == "Ascending"))
 
     return df
+
+# def initialize_dmf_session_state():
+#     if 'data' not in st.session_state:
+#         st.session_state.data = None
+#     if 'uploaded_file_name' not in st.session_state:
+#         st.session_state.uploaded_file_name = None
 
 def display_main_application_content():
                         
@@ -812,7 +818,7 @@ def display_main_application_content():
                         data['Date Registered'] = pd.to_datetime(data['Date Registered'])
                     except Exception as e:
                         st.error(f"Failed to convert 'Date Registered' to datetime: {e}")
-
+                        
                 # Filtering options
                 if 'Manufacturers' in data.columns:
                     manufacturer_options = ['All Manufacturers'] + sorted(data['Manufacturers'].dropna().unique().tolist())
@@ -2886,7 +2892,7 @@ def display_main_application_content():
             
         elif choice == 'FDA Filed DMFs':
             st.subheader('FDA Filed DMFs')
-            
+              
             uploaded_file = st.file_uploader("Upload your file", type=['csv'])
 
             required_columns = ['STATUS', 'TYPE', 'SUBMIT DATE', 'HOLDER', 'SUBJECT']
@@ -2894,7 +2900,7 @@ def display_main_application_content():
             if uploaded_file is not None:
                 if 'uploaded_file_name' not in st.session_state or st.session_state.uploaded_file_name != uploaded_file.name:
                     data = load_data_dmf(uploaded_file)
-                    valid, missing_cols = check_required_columns(data, required_columns)
+                    valid, missing_cols = check_required_columns_dmf(data, required_columns)
                     if not valid:
                         st.error(f"Missing columns in the uploaded file: {', '.join(missing_cols)}. Please upload a file with all required columns.")
                         return
