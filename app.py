@@ -819,6 +819,18 @@ def display_main_application_content():
                     except Exception as e:
                         st.error(f"Failed to convert 'Date Registered' to datetime: {e}")
                         
+                # Example min_date and max_date
+                min_date = pd.to_datetime(data['Date Registered']).min()
+                max_date = pd.to_datetime(data['Date Registered']).max()
+            
+                # Date input for filtering
+                date_from = st.date_input("From Date", min_date, min_value=min_date, max_value=max_date)
+                date_to = st.date_input("To Date", max_date, min_value=min_date, max_value=max_date)
+                
+                # Convert date input to datetime
+                date_from = pd.Timestamp(date_from)
+                date_to = pd.Timestamp(date_to)
+                        
                 # Filtering options
                 if 'Manufacturers' in data.columns:
                     manufacturer_options = ['All Manufacturers'] + sorted(data['Manufacturers'].dropna().unique().tolist())
@@ -839,7 +851,7 @@ def display_main_application_content():
 
                 applicant_options = ['All Applicants'] + sorted(data['Applicant Name'].dropna().unique().tolist())
                 selected_applicant = st.selectbox('Select Applicant Name', applicant_options, index=0)
-
+                
                 # Sort order options
                 sort_order_generic_options = ['Ascending', 'Descending']
                 selected_sort_order_generic = st.selectbox('Sort by Generic Name', sort_order_generic_options)
@@ -849,7 +861,7 @@ def display_main_application_content():
 
                 sort_order_date_registered_options = ['Ascending', 'Descending']
                 selected_sort_order_date_registered = st.selectbox('Sort by Date Registered', sort_order_date_registered_options)
-
+                
                 # Filter data based on selections
                 filtered_data = data
                 if selected_manufacturer != 'All Manufacturers':
@@ -864,6 +876,9 @@ def display_main_application_content():
                     filtered_data = filtered_data[filtered_data['Categories for Distribution'] == selected_category]
                 if selected_applicant != 'All Applicants':
                     filtered_data = filtered_data[filtered_data['Applicant Name'] == selected_applicant]
+                    
+                # Apply date range filter
+                filtered_data = filtered_data[(filtered_data['Date Registered'] >= date_from) & (filtered_data['Date Registered'] <= date_to)]
 
                 # Apply sorting based on the selected order
                 filtered_data = filtered_data.sort_values(
