@@ -842,9 +842,12 @@ def display_main_application_content():
 
                 form_options = ['All Forms'] + sorted(data['Form'].dropna().unique().tolist())
                 selected_form = st.selectbox('Select Form', form_options, index=0)
-
+                
+                # Generating options for the multiselect widget
                 principal_options = ['All Principal'] + sorted(data['Principal Name'].dropna().unique().tolist())
-                selected_principal = st.selectbox('Select Principal Name', principal_options, index=0)
+
+                # Multiselect widget for selecting one or more principal names
+                selected_principals = st.multiselect('Select Principal Name(s)', principal_options, default=['All Principal'])
 
                 category_options = ['All Categories of Distribution'] + sorted(data['Categories for Distribution'].dropna().unique().tolist())
                 selected_category = st.selectbox('Select Category of Distribution', category_options, index=0)
@@ -870,8 +873,13 @@ def display_main_application_content():
                     filtered_data = filtered_data[filtered_data['Generic Name'] == selected_product]
                 if selected_form != 'All Forms':
                     filtered_data = filtered_data[filtered_data['Form'] == selected_form]
-                if selected_principal != 'All Principal':
-                    filtered_data = filtered_data[filtered_data['Principal Name'] == selected_principal]
+                # Filter data based on the selection
+                if 'All Principal' in selected_principals:
+                    filtered_data = data  # If 'All Principal' is selected, do not filter on this criterion
+                else:
+                    # Filter data for selected principal names
+                    filtered_data = data[data['Principal Name'].isin(selected_principals)]
+
                 if selected_category != 'All Categories of Distribution':
                     filtered_data = filtered_data[filtered_data['Categories for Distribution'] == selected_category]
                 if selected_applicant != 'All Applicants':
