@@ -831,8 +831,9 @@ def display_main_application_content():
                 form_options = ['All Forms'] + sorted(data['Form'].dropna().unique().tolist())
                 selected_form = st.selectbox('Select Form', form_options, index=0)
 
+                # Multiselect widget for selecting one or more principal names
                 principal_options = ['All Principal'] + sorted(data['Principal Name'].dropna().unique().tolist())
-                selected_principal = st.selectbox('Select Principal Name', principal_options, index=0)
+                selected_principals = st.multiselect('Select Principal Name(s)', principal_options, default=['All Principal'])
 
                 category_options = ['All Categories of Distribution'] + sorted(data['Categories for Distribution'].dropna().unique().tolist())
                 selected_category = st.selectbox('Select Category of Distribution', category_options, index=0)
@@ -851,39 +852,48 @@ def display_main_application_content():
                 selected_sort_order_date_registered = st.selectbox('Sort by Date Registered', sort_order_date_registered_options)
 
                 # Filter data based on selections
-                filtered_data = data
+                filtered_data = data.copy()
                 if selected_manufacturer != 'All Manufacturers':
                     filtered_data = filtered_data[filtered_data['Manufacturers'] == selected_manufacturer]
                 if selected_product != 'All Products':
                     filtered_data = filtered_data[filtered_data['Generic Name'] == selected_product]
                 if selected_form != 'All Forms':
                     filtered_data = filtered_data[filtered_data['Form'] == selected_form]
-                if selected_principal != 'All Principal':
-                    filtered_data = filtered_data[filtered_data['Principal Name'] == selected_principal]
+
+                # Filter data based on the selection
+                if 'All Principal' not in selected_principals:
+                    filtered_data = filtered_data[filtered_data['Principal Name'].isin(selected_principals)]
+
                 if selected_category != 'All Categories of Distribution':
                     filtered_data = filtered_data[filtered_data['Categories for Distribution'] == selected_category]
                 if selected_applicant != 'All Applicants':
                     filtered_data = filtered_data[filtered_data['Applicant Name'] == selected_applicant]
 
                 # Apply sorting based on the selected order
-                filtered_data = filtered_data.sort_values(
-                    by=['Generic Name', 'Strength', 'Date Registered'],
-                    ascending=[
-                        selected_sort_order_generic == 'Ascending',
-                        selected_sort_order_strength == 'Ascending',
-                        selected_sort_order_date_registered == 'Ascending'
-                    ]
-                )
-                
-                # Apply sorting based on the selected order
-                filtered_data = filtered_data.sort_values(
-                    by=['Date Registered'],
-                    ascending=selected_sort_order_date_registered == 'Ascending'
-                )
-                
-                # Convert the "Date Registered" column to the desired format (e.g., "01 December 2024")
-                filtered_data['Date Registered'] = filtered_data['Date Registered'].dt.strftime('%d %B %Y')
+                sort_criteria = []
+                ascending_order = []
 
+                # Add sorting criteria based on user selection
+                if selected_sort_order_generic:
+                    sort_criteria.append('Generic Name')
+                    ascending_order.append(selected_sort_order_generic == 'Ascending')
+
+                if selected_sort_order_strength:
+                    sort_criteria.append('Strength')
+                    ascending_order.append(selected_sort_order_strength == 'Ascending')
+
+                if selected_sort_order_date_registered:
+                    sort_criteria.append('Date Registered')
+                    ascending_order.append(selected_sort_order_date_registered == 'Ascending')
+
+                # Apply sorting to the filtered data
+                if sort_criteria:
+                    filtered_data = filtered_data.sort_values(by=sort_criteria, ascending=ascending_order)
+
+                # Convert the "Date Registered" column to the desired format (e.g., "01 December 2024")
+                filtered_data['Date Registered'] = pd.to_datetime(filtered_data['Date Registered']).dt.strftime('%d %B %Y')
+
+              
                 # Display the filtered and sorted dataframe
                 st.write("Filtered Data:")
                 st.dataframe(filtered_data)
