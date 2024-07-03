@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[ ]:
 
 
 import streamlit as st
@@ -754,11 +754,25 @@ def filter_data(df, status, type_filter, date_from, date_to, holder, subject, ho
 
     return df
 
-# def initialize_dmf_session_state():
-#     if 'data' not in st.session_state:
-#         st.session_state.data = None
-#     if 'uploaded_file_name' not in st.session_state:
-#         st.session_state.uploaded_file_name = None
+# Define function to extract the town from the business address
+def extract_town(address):
+    if pd.notna(address):
+        return address.split()[-1]
+    return ''
+
+# Function to load data and process it
+def load_and_process_data(file):
+    # Load the data
+    df = pd.read_csv(file)
+    
+    # Select the required columns
+    df = df[['Name', 'Gender', 'Registration Number', 'Qualification', 'Specialty', 'Business Address', 'Business Contact']]
+    
+    # Derive the Town column
+    df['Town'] = df['Business Address'].apply(extract_town)
+    
+    return df
+
 
 def display_main_application_content():
                         
@@ -772,7 +786,8 @@ def display_main_application_content():
     menu = ['Data Overview', 'Market Analysis', 'Principal Analysis', 'FDA Orange Book Analysis', 
             'FDA Applicant Analysis', 'Drugs@FDA Analysis','Patient-flow Forecast', 'Drug Classification Analysis', 
             'Drugs with no Competition', 'Top Pharma Companies Sales', 'FDA Drug Establishment Sites', 
-            'FDA NME & New Biologic Approvals', 'EMA FDA Health Canada Approvals 2023', 'FDA Filed DMFs']
+            'FDA NME & New Biologic Approvals', 'EMA FDA Health Canada Approvals 2023', 'FDA Filed DMFs',
+           'Healthcare Practitioners']
     choice = st.sidebar.radio("Menu", menu)
     
     # File uploader
@@ -1744,6 +1759,9 @@ def display_main_application_content():
 
                 # Remove records with no patents
                 merged_df = merged_df.dropna(subset=['Patent_No'])
+                
+                # Retain records with no TE_Code in the original DataFrame
+                merged_df = merged_df[merged_df['TE_Code'].isna()]
 
                 # Remove records with "Type" equal to "DISCN"
                 merged_df = merged_df[merged_df['Type'] != 'DISCN']
@@ -3049,7 +3067,62 @@ def display_main_application_content():
                 )
             else:
                 st.write("Please upload a Drugs@FDA file to analyze")
-              
+        
+        # Choice Healthcare Practitioners
+        elif choice == 'Healthcare Practitioners':
+            st.subheader("Healthcare Practitioners")
+            
+            # Initialize session state if not already initialized
+            if 'healthcare_data' not in st.session_state:
+                st.session_state['healthcare_data'] = None
+
+            # File upload
+            uploaded_file = st.file_uploader("Upload your CSV file", type="csv")
+
+            if uploaded_file is not None:
+                # Load and process data
+                df = load_and_process_data(uploaded_file)
+
+                # Save to session state
+                st.session_state['healthcare_data'] = df
+
+            # If there is data in session state, proceed
+            if st.session_state['healthcare_data'] is not None:
+                df = st.session_state['healthcare_data']
+
+                # Convert necessary columns to strings to avoid type errors
+                df['Specialty'] = df['Specialty'].astype(str)
+                df['Town'] = df['Town'].astype(str)
+                df['Gender'] = df['Gender'].astype(str)
+
+                # Filters
+                specialty_filter = st.selectbox("Select Specialty", options=["All"] + sorted(df['Specialty'].unique().tolist()))
+                town_filter = st.selectbox("Select Town", options=["All"] + sorted(df['Town'].unique().tolist(), reverse=True))
+                gender_filter = st.selectbox("Select Gender", options=["All"] + sorted(df['Gender'].unique().tolist()))
+
+                # Apply filters
+                if specialty_filter != "All":
+                    df = df[df['Specialty'] == specialty_filter]
+                if town_filter != "All":
+                    df = df[df['Town'] == town_filter]
+                if gender_filter != "All":
+                    df = df[df['Gender'] == gender_filter]
+
+                # Display filtered dataframe
+                st.dataframe(df)
+
+                # Display the count of the filtered dataframe
+                st.write(f'Count of filtered results: {len(df)}')
+
+                # Option to download filtered data
+                csv = df.to_csv(index=False)
+                st.download_button(
+                    label="Download filtered data as CSV",
+                    data=csv,
+                    file_name='filtered_healthcare_practitioners.csv',
+                    mime='text/csv',
+                )
+        
     else:
         st.warning('Please upload MCAZ Register CSV file.')
         
@@ -3089,11 +3162,5 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-# In[ ]:
-
-
 
 
