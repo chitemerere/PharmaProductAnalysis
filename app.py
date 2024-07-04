@@ -718,6 +718,12 @@ def calculate_patients():
 def load_data_maturity(uploaded_file):
     return pd.read_csv(uploaded_file)  # Adjust this if your file is not a CSV
 
+# Initialize dmf session state if not already initialized
+if 'uploaded_file_name' not in st.session_state:
+    st.session_state['uploaded_file_name'] = None
+if 'data' not in st.session_state:
+    st.session_state['data'] = None
+
 def load_data_dmf(file):
     try:
         # Attempt to parse 'SUBMIT DATE' as dates
@@ -753,6 +759,8 @@ def filter_data(df, status, type_filter, date_from, date_to, holder, subject, ho
         df = df.sort_values(by='SUBJECT', ascending=(subject_sort == "Ascending"))
 
     return df
+
+
 
 # Define function to extract the town from the business address
 def extract_town(address):
@@ -2920,35 +2928,36 @@ def display_main_application_content():
             
         elif choice == 'FDA Filed DMFs':
             st.subheader('FDA Filed DMFs')
-              
-            uploaded_file = st.file_uploader("Upload your file", type=['csv'])
+            
+            uploaded_file = st.file_uploader("Upload your dmf file", type=['csv'])
 
             required_columns = ['STATUS', 'TYPE', 'SUBMIT DATE', 'HOLDER', 'SUBJECT']
 
             if uploaded_file is not None:
-                if 'uploaded_file_name' not in st.session_state or st.session_state.uploaded_file_name != uploaded_file.name:
+                if st.session_state['uploaded_file_name'] != uploaded_file.name:
                     data = load_data_dmf(uploaded_file)
                     valid, missing_cols = check_required_columns_dmf(data, required_columns)
                     if not valid:
                         st.error(f"Missing columns in the uploaded file: {', '.join(missing_cols)}. Please upload a file with all required columns.")
-                        return
-                    st.session_state.data = data
-                    st.session_state.uploaded_file_name = uploaded_file.name
+                        st.stop()
+                    st.session_state['data'] = data
+                    st.session_state['uploaded_file_name'] = uploaded_file.name
 
-                min_date = st.session_state.data['SUBMIT DATE'].min()
-                max_date = st.session_state.data['SUBMIT DATE'].max()
+            if st.session_state['data'] is not None:
+                min_date = st.session_state['data']['SUBMIT DATE'].min()
+                max_date = st.session_state['data']['SUBMIT DATE'].max()
 
                 # Filters
-                status = st.selectbox('Status', ['All'] + sorted(st.session_state.data['STATUS'].unique().tolist()), index=0)
-                type_filter = st.selectbox('Type', ['All'] + sorted(st.session_state.data['TYPE'].unique().tolist()), index=0)
+                status = st.selectbox('Status', ['All'] + sorted(st.session_state['data']['STATUS'].unique().tolist()), index=0)
+                type_filter = st.selectbox('Type', ['All'] + sorted(st.session_state['data']['TYPE'].unique().tolist()), index=0)
                 date_from = st.date_input("From Date", min_date, min_value=min_date, max_value=max_date)
                 date_to = st.date_input("To Date", max_date, min_value=min_date, max_value=max_date)
-                holder = st.selectbox('Holder', ['All'] + sorted(st.session_state.data['HOLDER'].unique().tolist()), index=0)
+                holder = st.selectbox('Holder', ['All'] + sorted(st.session_state['data']['HOLDER'].unique().tolist()), index=0)
                 holder_sort = st.selectbox('Sort Holder', ["None", "Ascending", "Descending"])
-                subject = st.multiselect('Subject', ['All'] + sorted(st.session_state.data['SUBJECT'].unique().tolist()), default=['All'])
+                subject = st.multiselect('Subject', ['All'] + sorted(st.session_state['data']['SUBJECT'].unique().tolist()), default=['All'])
                 subject_sort = st.selectbox('Sort Subject', ["None", "Ascending", "Descending"])
 
-                filtered_data = filter_data(st.session_state.data, status, type_filter, date_from, date_to, holder, subject, holder_sort, subject_sort)
+                filtered_data = filter_data(st.session_state['data'], status, type_filter, date_from, date_to, holder, subject, holder_sort, subject_sort)
 
                 st.write(filtered_data)
                 st.write("Total records:", filtered_data.shape[0])
@@ -2956,8 +2965,8 @@ def display_main_application_content():
                 if st.button("Save to CSV"):
                     csv = filtered_data.to_csv(index=False)
                     st.download_button(label="Download CSV", data=csv, file_name='filtered_data.csv', mime='text/csv')
+              
 
-    
         # Assuming 'choice' variable is determined by some user interaction upstream in your code
         if choice == 'Drugs@FDA Analysis':
             
