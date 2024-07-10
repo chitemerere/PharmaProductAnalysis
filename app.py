@@ -781,6 +781,70 @@ def load_and_process_data(file):
     
     return df
 
+# # Define a function to filter out groups with mixed TE_Code values
+# def filter_te_code(df):
+#     # Group by 'Active Ingredient' and create a mask for groups with all NaN TE_Code values
+#     all_na_mask = df.groupby('Ingredient')['TE_Code'].transform(lambda x: x.isna().all())
+    
+#     # Group by 'Active Ingredient' and create a mask for groups with any non-NaN TE_Code values
+#     any_notna_mask = df.groupby('Ingredient')['TE_Code'].transform(lambda x: x.notna().any())
+    
+#     # Retain groups where all TE_Code values are NaN (i.e., retain only if the group is all NaN)
+#     retain_mask = all_na_mask & ~any_notna_mask
+    
+#     # Filter the DataFrame based on the retain_mask
+#     filtered_df = df[retain_mask]
+    
+#     return filtered_df
+
+# # Define a function to filter out groups with mixed TE_Code values
+# def filter_te_code(df):
+#     # Group by 'Active Ingredient' and check if all TE_Code values are NaN
+#     all_na_mask = df.groupby('Ingredient')['TE_Code'].transform(lambda x: x.isna().all())
+    
+#     # Group by 'Active Ingredient' and check if any TE_Code value is not NaN
+#     any_notna_mask = df.groupby('Ingredient')['TE_Code'].transform(lambda x: x.notna().any())
+    
+#     # Retain groups where all TE_Code values are NaN
+#     retain_mask = all_na_mask & ~any_notna_mask
+    
+#     # Apply the mask to filter the DataFrame
+#     filtered_df = df[retain_mask]
+    
+#     return filtered_df
+
+# # Define a function to filter out groups based on the presence of TE_Code
+# def filter_te_code(df):
+#     # Group by 'Active Ingredient' and check if any TE_Code value is not NaN
+#     group_has_any_te_code = df.groupby('Ingredient')['TE_Code'].transform(lambda x: x.notna().any())
+    
+#     # Create a mask for groups where all TE_Code values are NaN
+#     retain_mask = ~group_has_any_te_code
+    
+#     # Apply the mask to filter the DataFrame
+#     filtered_df = df[retain_mask]
+    
+#     return filtered_df
+
+# # Define a function to filter out groups based on the presence of TE_Code
+# def filter_te_code(df):
+#     # Group by 'Active Ingredient' and check if all TE_Code values are NaN
+#     all_na_mask = df.groupby('Ingredient')['TE_Code'].transform(lambda x: x.isna().all())
+    
+#     # Group by 'Active Ingredient' and check if any TE_Code value is not NaN
+#     any_notna_mask = df.groupby('Ingredient')['TE_Code'].transform(lambda x: x.notna().any())
+    
+#     # Identify groups with mixed TE_Code values
+#     mixed_mask = all_na_mask & any_notna_mask
+    
+#     # Retain groups where all TE_Code values are NaN
+#     retain_mask = all_na_mask & ~any_notna_mask
+    
+#     # Apply the mask to filter the DataFrame
+#     filtered_df = df[retain_mask]
+    
+#     return filtered_df
+
 
 def display_main_application_content():
                         
@@ -1765,15 +1829,29 @@ def display_main_application_content():
                 # Remove duplicates
                 merged_df = merged_df.drop_duplicates(subset=['Ingredient', 'DF;Route', 'Strength', 'Appl_No', 'Product_No_x', 'Patent_No'])
 
-                # Remove records with no patents
-                merged_df = merged_df.dropna(subset=['Patent_No'])
-                
-                # Retain records with no TE_Code in the original DataFrame
-                merged_df = merged_df[merged_df['TE_Code'].isna()]
-
                 # Remove records with "Type" equal to "DISCN"
                 merged_df = merged_df[merged_df['Type'] != 'DISCN']
+                               
+                # To ensure the changes are applied to the original DataFrame in-place, you can use:
+                merged_df.sort_values(by='Ingredient', ascending=True, inplace=True)
                 
+#                 # Step 1: Identify Ingredients with mixed TE_Code values
+#                 ingredient_te_code = merged_df.groupby(['Ingredient', 'DF;Route'])['TE_Code'].apply(lambda x: x.notna().any() and x.isna().any())
+#                 mixed_te_code_ingredients = ingredient_te_code[ingredient_te_code].index
+                              
+                # Step 1: Identify Ingredients with mixed TE_Code values
+                ingredient_te_code = merged_df.groupby('Ingredient')['TE_Code'].apply(lambda x: x.notna().any() and x.isna().any())
+                mixed_te_code_ingredients = ingredient_te_code[ingredient_te_code].index
+                
+                # Step 2: Filter out these Ingredients
+                merged_df = merged_df[~merged_df['Ingredient'].isin(mixed_te_code_ingredients)]
+
+                # Retain records with no TE_Code in the original DataFrame
+                merged_df = merged_df[merged_df['TE_Code'].isna()]
+        
+                # Remove records with no patents
+                merged_df = merged_df.dropna(subset=['Patent_No'])
+                                               
                 # Convert 'Patent_No' column to string
                 merged_df['Patent_No'] = merged_df['Patent_No'].astype(str)
                 
