@@ -781,71 +781,6 @@ def load_and_process_data(file):
     
     return df
 
-# # Define a function to filter out groups with mixed TE_Code values
-# def filter_te_code(df):
-#     # Group by 'Active Ingredient' and create a mask for groups with all NaN TE_Code values
-#     all_na_mask = df.groupby('Ingredient')['TE_Code'].transform(lambda x: x.isna().all())
-    
-#     # Group by 'Active Ingredient' and create a mask for groups with any non-NaN TE_Code values
-#     any_notna_mask = df.groupby('Ingredient')['TE_Code'].transform(lambda x: x.notna().any())
-    
-#     # Retain groups where all TE_Code values are NaN (i.e., retain only if the group is all NaN)
-#     retain_mask = all_na_mask & ~any_notna_mask
-    
-#     # Filter the DataFrame based on the retain_mask
-#     filtered_df = df[retain_mask]
-    
-#     return filtered_df
-
-# # Define a function to filter out groups with mixed TE_Code values
-# def filter_te_code(df):
-#     # Group by 'Active Ingredient' and check if all TE_Code values are NaN
-#     all_na_mask = df.groupby('Ingredient')['TE_Code'].transform(lambda x: x.isna().all())
-    
-#     # Group by 'Active Ingredient' and check if any TE_Code value is not NaN
-#     any_notna_mask = df.groupby('Ingredient')['TE_Code'].transform(lambda x: x.notna().any())
-    
-#     # Retain groups where all TE_Code values are NaN
-#     retain_mask = all_na_mask & ~any_notna_mask
-    
-#     # Apply the mask to filter the DataFrame
-#     filtered_df = df[retain_mask]
-    
-#     return filtered_df
-
-# # Define a function to filter out groups based on the presence of TE_Code
-# def filter_te_code(df):
-#     # Group by 'Active Ingredient' and check if any TE_Code value is not NaN
-#     group_has_any_te_code = df.groupby('Ingredient')['TE_Code'].transform(lambda x: x.notna().any())
-    
-#     # Create a mask for groups where all TE_Code values are NaN
-#     retain_mask = ~group_has_any_te_code
-    
-#     # Apply the mask to filter the DataFrame
-#     filtered_df = df[retain_mask]
-    
-#     return filtered_df
-
-# # Define a function to filter out groups based on the presence of TE_Code
-# def filter_te_code(df):
-#     # Group by 'Active Ingredient' and check if all TE_Code values are NaN
-#     all_na_mask = df.groupby('Ingredient')['TE_Code'].transform(lambda x: x.isna().all())
-    
-#     # Group by 'Active Ingredient' and check if any TE_Code value is not NaN
-#     any_notna_mask = df.groupby('Ingredient')['TE_Code'].transform(lambda x: x.notna().any())
-    
-#     # Identify groups with mixed TE_Code values
-#     mixed_mask = all_na_mask & any_notna_mask
-    
-#     # Retain groups where all TE_Code values are NaN
-#     retain_mask = all_na_mask & ~any_notna_mask
-    
-#     # Apply the mask to filter the DataFrame
-#     filtered_df = df[retain_mask]
-    
-#     return filtered_df
-
-
 def display_main_application_content():
                         
     # Initialize mcaz_register as an empty DataFrame at the start
@@ -3006,13 +2941,13 @@ def display_main_application_content():
             
         elif choice == 'FDA Filed DMFs':
             st.subheader('FDA Filed DMFs')
-            
-            uploaded_file = st.file_uploader("Upload your dmf file", type=['csv'])
+
+            uploaded_file = st.file_uploader("Upload your DMF file", type=['csv'])
 
             required_columns = ['STATUS', 'TYPE', 'SUBMIT DATE', 'HOLDER', 'SUBJECT']
 
             if uploaded_file is not None:
-                if st.session_state['uploaded_file_name'] != uploaded_file.name:
+                if st.session_state.get('uploaded_file_name') != uploaded_file.name:
                     data = load_data_dmf(uploaded_file)
                     valid, missing_cols = check_required_columns_dmf(data, required_columns)
                     if not valid:
@@ -3021,7 +2956,7 @@ def display_main_application_content():
                     st.session_state['data'] = data
                     st.session_state['uploaded_file_name'] = uploaded_file.name
 
-            if st.session_state['data'] is not None:
+            if st.session_state.get('data') is not None:
                 min_date = st.session_state['data']['SUBMIT DATE'].min()
                 max_date = st.session_state['data']['SUBMIT DATE'].max()
 
@@ -3036,17 +2971,22 @@ def display_main_application_content():
                 subject_sort = st.selectbox('Sort Subject', ["None", "Ascending", "Descending"])
 
                 filtered_data = filter_data(st.session_state['data'], status, type_filter, date_from, date_to, holder, subject, holder_sort, subject_sort)
+                
+                # Add Google search column for Holder
+                filtered_data['Google Search'] = filtered_data['HOLDER'].apply(lambda x: f'<a href="https://www.google.com/search?q={x}" target="_blank">Search</a>')
+                
+                # Display a limited number of rows
+                st.write(filtered_data.head(100).to_html(escape=False), unsafe_allow_html=True)
 
-                st.write(filtered_data)
                 st.write("Total records:", filtered_data.shape[0])
 
                 if st.button("Save to CSV"):
                     csv = filtered_data.to_csv(index=False)
-                    st.download_button(label="Download CSV", data=csv, file_name='filtered_data.csv', mime='text/csv')
-              
+                    st.download_button(label="Download CSV", data=csv, file_name='filtered_dmf_data.csv', mime='text/csv')
 
+            
         # Assuming 'choice' variable is determined by some user interaction upstream in your code
-        if choice == 'Drugs@FDA Analysis':
+        elif choice == 'Drugs@FDA Analysis':
             
             # Simplified session state management
             if choice:
@@ -3068,8 +3008,6 @@ def display_main_application_content():
             uploaded_file = st.file_uploader("Choose a file")
             if uploaded_file is not None:
                 st.session_state['data'] = load_data_maturity(uploaded_file)
-#                 merged_df = load_data_maturity(uploaded_file)
-#                 st.session_state['merged_df'] = merged_df
                 
                 # Display and filter data if loaded
                 if st.session_state['data'] is not None:
