@@ -2971,20 +2971,39 @@ def display_main_application_content():
                 subject_sort = st.selectbox('Sort Subject', ["None", "Ascending", "Descending"])
 
                 filtered_data = filter_data(st.session_state['data'], status, type_filter, date_from, date_to, holder, subject, holder_sort, subject_sort)
-                
+
                 # Add Google search column for Holder
                 filtered_data['Google Search'] = filtered_data['HOLDER'].apply(lambda x: f'<a href="https://www.google.com/search?q={x}" target="_blank">Search</a>')
-                
-                # Display a limited number of rows
-                st.write(filtered_data.head(100).to_html(escape=False), unsafe_allow_html=True)
 
-                st.write("Total records:", filtered_data.shape[0])
+                # Pagination
+                if 'page' not in st.session_state:
+                    st.session_state.page = 0
+
+                items_per_page = 100
+                total_pages = (len(filtered_data) - 1) // items_per_page + 1
+
+                start_index = st.session_state.page * items_per_page
+                end_index = min(start_index + items_per_page, len(filtered_data))
+
+                st.write(filtered_data.iloc[start_index:end_index].to_html(escape=False), unsafe_allow_html=True)
+                st.write(f"Showing records {start_index + 1} to {end_index} of {len(filtered_data)}")
+
+                col1, col2, col3 = st.columns([1, 1, 1])
+
+                if col1.button("Previous") and st.session_state.page > 0:
+                    st.session_state.page -= 1
+
+                if col3.button("Next") and st.session_state.page < total_pages - 1:
+                    st.session_state.page += 1
+
+                if col2.button("Reset"):
+                    st.session_state.page = 0
 
                 if st.button("Save to CSV"):
                     csv = filtered_data.to_csv(index=False)
-                    st.download_button(label="Download CSV", data=csv, file_name='filtered_dmf_data.csv', mime='text/csv')
-
+                    st.download_button(label="Download CSV", data=csv, file_name='filtered_data.csv', mime='text/csv')
             
+           
         # Assuming 'choice' variable is determined by some user interaction upstream in your code
         elif choice == 'Drugs@FDA Analysis':
             
