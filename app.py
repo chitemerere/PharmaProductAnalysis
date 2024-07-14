@@ -723,45 +723,56 @@ if 'uploaded_file_name' not in st.session_state:
     st.session_state['uploaded_file_name'] = None
 if 'data' not in st.session_state:
     st.session_state['data'] = None
-
-def load_data_dmf(file):
-    try:
-        # Attempt to parse 'SUBMIT DATE' as dates
-        return pd.read_csv(file, parse_dates=['SUBMIT DATE'])
-    except UnicodeDecodeError:
-        return pd.read_csv(file, encoding='ISO-8859-1', parse_dates=['SUBMIT DATE'])
     
+# Example placeholder functions for the necessary functionality
+def load_data_dmf(file):
+    # Load the data without parsing dates initially
+    data = pd.read_csv(file)
+    
+    # Check if 'SUBMIT DATE' column exists, then parse dates
+    if 'SUBMIT DATE' in data.columns:
+        data['SUBMIT DATE'] = pd.to_datetime(data['SUBMIT DATE'])
+    
+    return data
+
 def check_required_columns_dmf(df, required_columns):
     missing_columns = [col for col in required_columns if col not in df.columns]
     if missing_columns:
         return False, missing_columns
     return True, None
+
+def filter_data(data, status, type_filter, date_from, date_to, holder, subject, holder_sort, subject_sort):
+    filtered = data.copy()
     
-def filter_data(df, status, type_filter, date_from, date_to, holder, subject, holder_sort, subject_sort):
-    if status != "All":
-        df = df[df['STATUS'] == status]
-    if type_filter != "All":
-        df = df[df['TYPE'] == type_filter]
-            
-    if date_from != "All" and date_to != "All":
-        date_from = pd.Timestamp(date_from)
-        date_to = pd.Timestamp(date_to)
-        df = df[(df['SUBMIT DATE'] >= date_from) & (df['SUBMIT DATE'] <= date_to)]
-
-    if holder != "All":
-        df = df[df['HOLDER'] == holder]
+    if status != 'All':
+        filtered = filtered[filtered['STATUS'] == status]
+    
+    if type_filter != 'All':
+        filtered = filtered[filtered['TYPE'] == type_filter]
+    
+    # Convert date_from and date_to to datetime64
+    date_from = pd.to_datetime(date_from)
+    date_to = pd.to_datetime(date_to)
+    
+    # Check if 'SUBMIT DATE' column exists before filtering by date
+    if 'SUBMIT DATE' in filtered.columns:
+        filtered = filtered[(filtered['SUBMIT DATE'] >= date_from) & (filtered['SUBMIT DATE'] <= date_to)]
+    
+    if holder != 'All':
+        filtered = filtered[filtered['HOLDER'] == holder]
+    
     if 'All' not in subject:
-        df = df[df['SUBJECT'].isin(subject)]
-
+        filtered = filtered[filtered['SUBJECT'].isin(subject)]
+    
     if holder_sort != "None":
-        df = df.sort_values(by='HOLDER', ascending=(holder_sort == "Ascending"))
+        filtered = filtered.sort_values(by='HOLDER', ascending=(holder_sort == "Ascending"))
+    
     if subject_sort != "None":
-        df = df.sort_values(by='SUBJECT', ascending=(subject_sort == "Ascending"))
+        filtered = filtered.sort_values(by='SUBJECT', ascending=(subject_sort == "Ascending"))
+    
+    return filtered
 
-    return df
-
-
-
+  
 # Define function to extract the town from the business address
 def extract_town(address):
     if pd.notna(address):
@@ -2941,7 +2952,7 @@ def display_main_application_content():
             
         elif choice == 'FDA Filed DMFs':
             st.subheader('FDA Filed DMFs')
-
+            
             uploaded_file = st.file_uploader("Upload your DMF file", type=['csv'])
 
             required_columns = ['STATUS', 'TYPE', 'SUBMIT DATE', 'HOLDER', 'SUBJECT']
@@ -2957,8 +2968,14 @@ def display_main_application_content():
                     st.session_state['uploaded_file_name'] = uploaded_file.name
 
             if st.session_state.get('data') is not None:
-                min_date = st.session_state['data']['SUBMIT DATE'].min()
-                max_date = st.session_state['data']['SUBMIT DATE'].max()
+                # Check if 'SUBMIT DATE' column exists before setting min_date and max_date
+                if 'SUBMIT DATE' in st.session_state['data'].columns:
+                    st.session_state['data']['SUBMIT DATE'] = pd.to_datetime(st.session_state['data']['SUBMIT DATE'])
+                    min_date = st.session_state['data']['SUBMIT DATE'].min()
+                    max_date = st.session_state['data']['SUBMIT DATE'].max()
+                else:
+                    st.error("The 'SUBMIT DATE' column is missing from the uploaded file.")
+                    st.stop()
 
                 # Filters
                 status = st.selectbox('Status', ['All'] + sorted(st.session_state['data']['STATUS'].unique().tolist()), index=0)
@@ -3001,9 +3018,9 @@ def display_main_application_content():
 
                 if st.button("Save to CSV"):
                     csv = filtered_data.to_csv(index=False)
-                    st.download_button(label="Download CSV", data=csv, file_name='filtered_data.csv', mime='text/csv')
-            
-           
+                    st.download_button(label="Download CSV", data=csv, file_name='filtered_data_dmfs.csv', mime='text/csv')
+
+         
         # Assuming 'choice' variable is determined by some user interaction upstream in your code
         elif choice == 'Drugs@FDA Analysis':
             
